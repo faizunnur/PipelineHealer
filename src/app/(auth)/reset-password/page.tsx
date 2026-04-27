@@ -1,21 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Zap, Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Zap, Loader2, Eye, EyeOff, CheckCircle2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+
+  // No token in URL
+  if (!token) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">
+          <AlertTriangle className="w-7 h-7 text-destructive" />
+        </div>
+        <h1 className="text-xl font-bold">Invalid reset link</h1>
+        <p className="text-sm text-muted-foreground">
+          This link is missing a reset token. Please request a new one.
+        </p>
+        <Link href="/forgot-password">
+          <Button className="w-full mt-2">Request New Link</Button>
+        </Link>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +55,7 @@ export default function ResetPasswordPage() {
     const res = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ token, password }),
     });
 
     setLoading(false);
@@ -45,9 +66,88 @@ export default function ResetPasswordPage() {
     } else {
       const { error } = await res.json();
       toast({ title: "Reset failed", description: error, variant: "destructive" });
+      // If token expired, nudge them to request again
+      if (error?.includes("expired")) {
+        setTimeout(() => router.push("/forgot-password"), 2000);
+      }
     }
   }
 
+  if (done) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+          <CheckCircle2 className="w-7 h-7 text-primary" />
+        </div>
+        <h1 className="text-xl font-bold">Password updated!</h1>
+        <p className="text-sm text-muted-foreground">Redirecting you to sign in…</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Set new password</h1>
+        <p className="text-muted-foreground text-sm mt-1">Must be at least 8 characters.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="password">New Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoFocus
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirm">Confirm Password</Label>
+          <Input
+            id="confirm"
+            type="password"
+            placeholder="••••••••"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+          {confirm && password !== confirm && (
+            <p className="text-xs text-destructive">Passwords do not match</p>
+          )}
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={loading || (!!confirm && password !== confirm)}
+        >
+          {loading ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
+          ) : (
+            "Update Password"
+          )}
+        </Button>
+      </form>
+    </>
+  );
+}
+
+export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-background">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -55,7 +155,6 @@ export default function ResetPasswordPage() {
       </div>
 
       <div className="relative w-full max-w-md animate-fade-up">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -66,78 +165,9 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-xl shadow-black/10">
-          {done ? (
-            <div className="text-center space-y-4">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-7 h-7 text-primary" />
-              </div>
-              <h1 className="text-xl font-bold">Password updated!</h1>
-              <p className="text-sm text-muted-foreground">
-                Redirecting you to sign in…
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold">Set new password</h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Must be at least 8 characters.
-                </p>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="password">New Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoFocus
-                      className="pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirm">Confirm Password</Label>
-                  <Input
-                    id="confirm"
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirm}
-                    onChange={(e) => setConfirm(e.target.value)}
-                    required
-                  />
-                  {confirm && password !== confirm && (
-                    <p className="text-xs text-destructive">Passwords do not match</p>
-                  )}
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={loading || (!!confirm && password !== confirm)}
-                >
-                  {loading ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Updating...</>
-                  ) : (
-                    "Update Password"
-                  )}
-                </Button>
-              </form>
-            </>
-          )}
+          <Suspense fallback={<div className="h-48 animate-pulse rounded-lg bg-muted" />}>
+            <ResetPasswordForm />
+          </Suspense>
         </div>
       </div>
     </div>

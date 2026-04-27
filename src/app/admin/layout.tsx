@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   LayoutDashboard,
   Users,
@@ -22,14 +23,14 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const session = await getSession();
+  if (!session) redirect("/login");
 
-  const { data: profile } = await supabase
+  const db = createAdminClient();
+  const { data: profile } = await db
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", session.userId)
     .single();
 
   if (profile?.role !== "admin") redirect("/dashboard");
@@ -49,11 +50,7 @@ export default async function AdminLayout({
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="nav-item"
-              >
+              <Link key={item.href} href={item.href} className="nav-item">
                 <Icon className="w-4 h-4" />
                 {item.label}
               </Link>
@@ -62,10 +59,7 @@ export default async function AdminLayout({
         </nav>
 
         <div className="p-2 border-t border-border">
-          <Link
-            href="/dashboard"
-            className="nav-item text-muted-foreground"
-          >
+          <Link href="/dashboard" className="nav-item text-muted-foreground">
             <ArrowLeft className="w-4 h-4" />
             Back to App
           </Link>

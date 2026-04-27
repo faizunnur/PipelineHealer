@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -48,36 +47,20 @@ export default function HealingDetailPage() {
 
   useEffect(() => {
     loadEvent();
-    // Subscribe to realtime updates
-    const supabase = createClient();
-    const channel = supabase
-      .channel(`healing-${id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "healing_events",
-          filter: `id=eq.${id}`,
-        },
-        () => loadEvent()
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    // Poll for status updates every 3 seconds when applying
+    const interval = setInterval(() => {
+      if (event?.status === "applying") loadEvent();
+    }, 3000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, event?.status]);
 
   async function loadEvent() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("healing_events")
-      .select(
-        `*, pipelines(repo_full_name, provider), pipeline_jobs(job_name)`
-      )
-      .eq("id", id)
-      .single();
-    setEvent(data as HealingEvent | null);
+    const res = await fetch(`/api/healing/${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setEvent(data.event as HealingEvent | null);
+    }
     setLoading(false);
   }
 

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const db = createAdminClient();
+  const { data, error } = await db
     .from("profiles")
-    .select("full_name, email, approval_mode, tokens_used, token_budget, role")
-    .eq("id", user.id)
+    .select("id, full_name, email, approval_mode, tokens_used, token_budget, role")
+    .eq("id", session.userId)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -17,16 +18,16 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { full_name } = await req.json() as { full_name: string };
+  const db = createAdminClient();
 
-  const { error } = await supabase
+  const { error } = await db
     .from("profiles")
     .update({ full_name })
-    .eq("id", user.id);
+    .eq("id", session.userId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

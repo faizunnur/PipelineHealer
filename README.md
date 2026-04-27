@@ -169,14 +169,13 @@ POST /api/webhooks/github
 | **Language** | TypeScript 5 |
 | **Styling** | Tailwind CSS 3.4 + shadcn/ui (Radix UI) |
 | **Database** | Supabase (PostgreSQL) with Row Level Security |
-| **Auth** | Supabase Auth (email/password) |
+| **Auth** | Custom JWT — `jose` HS256, HTTP-only cookie `ph_session`, `bcryptjs` password hashing |
 | **AI** | Anthropic SDK — Claude Sonnet 4.6 (healing), Claude Haiku 4.5 (chat/reports) |
 | **Encryption** | Node.js `crypto` — AES-256-GCM |
 | **Webhooks** | HMAC-SHA256 signature verification |
 | **Validation** | Zod |
 | **Charts** | Recharts |
 | **Icons** | Lucide React |
-| **Realtime** | Supabase Realtime subscriptions |
 | **Deployment** | Vercel (recommended) |
 
 ---
@@ -308,9 +307,12 @@ src/
 │       ├── settings/approval-mode/ ← Approval mode toggle
 │       └── admin/users/            ← Admin user management
 ├── lib/
+│   ├── auth/
+│   │   ├── session.ts              ← JWT create/read/cookie helpers (jose)
+│   │   └── password.ts             ← bcryptjs hash + verify
 │   ├── supabase/
-│   │   ├── client.ts               ← Browser auth context (auth only)
-│   │   ├── server.ts               ← Server-side client (API routes)
+│   │   ├── client.ts               ← Browser Supabase client (DB queries only)
+│   │   ├── server.ts               ← Server-side service-role DB client
 │   │   ├── admin.ts                ← Service role client
 │   │   └── database.types.ts       ← TypeScript schema types
 │   ├── claude/
@@ -349,8 +351,7 @@ src/
 │   └── admin/
 │       └── AdminUserActions.tsx
 └── hooks/
-    ├── use-toast.ts
-    └── use-realtime-healing.ts     ← Live healing event updates
+    └── use-toast.ts
 ```
 
 ---
@@ -382,23 +383,24 @@ supabase/migrations/0003_functions.sql
 supabase/migrations/0004_new_features.sql
 supabase/migrations/0005_new_features_rls.sql
 supabase/migrations/0006_schema_updates.sql
+supabase/migrations/0007_additional_features.sql
+supabase/migrations/0008_add_password_hash.sql
 ```
 
-3. Enable **Realtime** on these tables: `pipelines`, `pipeline_runs`, `healing_events`
-   - Go to **Database → Replication → Tables** and enable each
-
-4. Copy your credentials:
+3. Copy your credentials:
    - **Project URL**: Settings → API → Project URL
    - **Anon key**: Settings → API → anon/public
    - **Service Role key**: Settings → API → service_role *(keep secret)*
 
-### Step 3 — Generate Encryption Key
+### Step 3 — Generate Secret Keys
+
+Run this command twice — once for `ENCRYPTION_KEY`, once for `JWT_SECRET`:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Save the 64-character output as your `ENCRYPTION_KEY`.
+Save each 64-character output for the next step.
 
 ### Step 4 — Environment Variables
 
@@ -414,7 +416,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ANTHROPIC_API_KEY=sk-ant-...
 ENCRYPTION_KEY=<64-char hex from step 3>
+JWT_SECRET=<64-char hex from step 3>
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+SMTP_HOST=mail.example.com
+SMTP_PORT=465
+SMTP_USER=you@example.com
+SMTP_PASS=your-smtp-password
 ```
 
 ### Step 5 — Run Development Server
@@ -480,9 +487,11 @@ ngrok http 3000
 
 ### Authentication
 
-**Register** at `/register` with your email and password. A profile is automatically created.
+**Register** at `/register` with your email, full name, and password. A profile is immediately created and you're signed in — no email confirmation required.
 
-**Login** at `/login`. If you have a `?redirectTo` parameter in the URL, you'll be taken there after login.
+**Login** at `/login`. If you have a `?redirectTo` parameter in the URL, you'll be taken there after login. A successful login sets an HTTP-only `ph_session` JWT cookie (7-day expiry).
+
+**Forgot password** — use `/forgot-password` to receive a reset link via email. The link leads to `/reset-password` where you can choose a new password.
 
 **Suspended accounts** are redirected to `/suspended` and cannot access the application until an admin re-enables them.
 
@@ -882,16 +891,20 @@ Accessible only to users with `role = 'admin'`.
 
 ## API Reference
 
-All API routes are under `/api/`. They require a valid session cookie set by Supabase Auth (except webhooks, which use HMAC verification).
+All API routes are under `/api/`. Protected routes require a valid `ph_session` JWT cookie (set by `POST /api/auth/login`). Webhooks use HMAC-SHA256 verification instead.
 
 ### Authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `POST` | `/api/auth/login` | Sign in — sets `ph_session` JWT cookie |
+| `POST` | `/api/auth/register` | Register new account — auto-signs in |
+| `POST` | `/api/auth/forgot-password` | Send password reset email |
+| `POST` | `/api/auth/reset-password` | Set new password via reset token |
+| `POST` | `/api/auth/signout` | Sign out — clears `ph_session` cookie |
 | `GET` | `/api/profile` | Get current user's profile |
 | `PATCH` | `/api/profile` | Update full name |
 | `DELETE` | `/api/account` | Delete account permanently |
-| `POST` | `/api/auth/signout` | Sign out (clears session cookie) |
 
 ### Integrations
 
@@ -988,12 +1001,19 @@ HMAC-SHA256(webhook_secret, raw_request_body) === X-Hub-Signature-256 header
 
 Comparison uses `crypto.timingSafeEqual` to prevent timing attacks. Unverified requests are rejected with `401`.
 
+### Session Security
+
+Authentication uses a custom JWT (`jose` library, HS256, 7-day expiry) stored in an HTTP-only `ph_session` cookie. Passwords are hashed with `bcryptjs` (12 rounds) and stored in `profiles.password_hash`. No Supabase Auth is used.
+
+All protected API routes verify the session server-side:
+```typescript
+const session = await getSession();
+if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+```
+
 ### Row Level Security
 
-Every database table enforces RLS policies:
-- `SELECT / INSERT / UPDATE / DELETE` — always filtered by `user_id = auth.uid()`
-- Admin operations use the service role key (bypasses RLS, server-side only)
-- Users can never read or modify another user's data via the API
+Every database table enforces RLS policies. All server-side queries use the **service role key** (bypasses RLS) and filter manually by `session.userId` — so users can never read or modify another user's data via the API. Admin operations additionally check `profile.role = 'admin'`.
 
 ### Token Budget
 
@@ -1047,9 +1067,14 @@ Use **nginx** as a reverse proxy and **PM2** to keep the process alive.
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key *(server only, keep secret)* |
 | `ANTHROPIC_API_KEY` | ✅ | Anthropic API key for Claude access |
 | `ENCRYPTION_KEY` | ✅ | 64-char hex string for AES-256-GCM token encryption |
-| `NEXT_PUBLIC_APP_URL` | ✅ | Public URL of the app (used for webhook URLs) |
+| `JWT_SECRET` | ✅ | 32+ char secret for signing `ph_session` JWT cookies |
+| `NEXT_PUBLIC_APP_URL` | ✅ | Public URL of the app (used for webhook URLs and password reset links) |
+| `SMTP_HOST` | ✅ | SMTP server hostname for password reset emails |
+| `SMTP_PORT` | ✅ | SMTP port (e.g. `465` for SSL) |
+| `SMTP_USER` | ✅ | SMTP login username |
+| `SMTP_PASS` | ✅ | SMTP password |
 
-Generate `ENCRYPTION_KEY`:
+Generate `ENCRYPTION_KEY` and `JWT_SECRET`:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```

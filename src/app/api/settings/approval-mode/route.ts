@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const schema = z.object({
@@ -7,9 +8,8 @@ const schema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
@@ -17,12 +17,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid data" }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const db = createAdminClient();
+  const { error } = await db
     .from("profiles")
     .update({ approval_mode: parsed.data.approval_mode })
-    .eq("id", user.id);
+    .eq("id", session.userId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ ok: true, approval_mode: parsed.data.approval_mode });
 }

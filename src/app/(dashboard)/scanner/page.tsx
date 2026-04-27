@@ -8,7 +8,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 type Finding = {
@@ -38,16 +37,14 @@ export default function ScannerPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      supabase.from("pipelines").select("id, repo_full_name, provider")
-        .eq("user_id", user.id).then(({ data }) => {
-          setPipelines(data ?? []);
-          if (data?.[0]) { setSelected(data[0].id); loadFindings(data[0].id); }
-          setLoading(false);
-        });
-    });
+    fetch("/api/pipelines")
+      .then((r) => r.json())
+      .then(({ pipelines: data }) => {
+        const list = (data ?? []) as Pipeline[];
+        setPipelines(list);
+        if (list[0]) { setSelected(list[0].id); loadFindings(list[0].id); }
+        setLoading(false);
+      });
   }, []);
 
   async function loadFindings(pipelineId: string) {

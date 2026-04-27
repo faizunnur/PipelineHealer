@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-
 import { decrypt } from "@/lib/crypto/decrypt";
 import { auditWorkflow } from "@/lib/env-audit/auditor";
 
-// POST /api/env-audit/[pipelineId] — run env audit on all workflow files
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
   const { pipelineId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const admin = createAdminClient();
-  const { data: pipeline } = await admin
+  const db = createAdminClient();
+  const { data: pipeline } = await db
     .from("pipelines")
     .select("id, repo_full_name, provider, integrations(encrypted_token, token_iv, token_tag)")
     .eq("id", pipelineId)
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .single();
 
   if (!pipeline) return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
@@ -38,7 +35,6 @@ export async function POST(
     tag: pipelineData.integrations.token_tag,
   });
 
-  // Fetch workflow files from GitHub
   const [owner, repo] = pipelineData.repo_full_name.split("/");
   const allFindings: Array<{
     pipeline_id: string; user_id: string; file_path: string;
@@ -47,15 +43,9 @@ export async function POST(
   }> = [];
 
   try {
-    // List .github/workflows directory
     const listRes = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/contents/.github/workflows`,
-      {
-        headers: {
-          Authorization: `Bearer ${plainToken}`,
-          Accept: "application/vnd.github+json",
-        },
-      }
+      { headers: { Authorization: `Bearer ${plainToken}`, Accept: "application/vnd.github+json" } }
     );
 
     if (!listRes.ok) {
@@ -77,7 +67,7 @@ export async function POST(
       for (const finding of result.findings) {
         allFindings.push({
           pipeline_id: pipelineId,
-          user_id: user.id,
+          user_id: session.userId,
           file_path: file.path,
           severity: finding.severity,
           rule: finding.rule,
@@ -90,10 +80,9 @@ export async function POST(
       }
     }
 
-    // Clear old findings and insert new ones
-    await admin.from("env_var_audits").delete().eq("pipeline_id", pipelineId);
+    await db.from("env_var_audits").delete().eq("pipeline_id", pipelineId);
     if (allFindings.length > 0) {
-      await admin.from("env_var_audits").insert(allFindings);
+      await db.from("env_var_audits").insert(allFindings);
     }
 
     return NextResponse.json({
@@ -109,46 +98,42 @@ export async function POST(
   }
 }
 
-// GET /api/env-audit/[pipelineId] — get existing findings
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
   const { pipelineId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const admin = createAdminClient();
-  const { data: findings } = await admin
+  const db = createAdminClient();
+  const { data: findings } = await db
     .from("env_var_audits")
     .select("*")
     .eq("pipeline_id", pipelineId)
-    .eq("user_id", user.id)
-    .order("severity", { ascending: true }); // critical first alphabetically
+    .eq("user_id", session.userId)
+    .order("severity", { ascending: true });
 
   return NextResponse.json({ findings: findings ?? [] });
 }
 
-// PATCH /api/env-audit/[pipelineId] — mark finding as resolved
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
   const { pipelineId } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { findingId, resolved } = await request.json();
-  const admin = createAdminClient();
+  const db = createAdminClient();
 
-  await admin
+  await db
     .from("env_var_audits")
     .update({ resolved: resolved ?? true, resolved_at: resolved ? new Date().toISOString() : null })
     .eq("id", findingId)
     .eq("pipeline_id", pipelineId)
-    .eq("user_id", user.id);
+    .eq("user_id", session.userId);
 
   return NextResponse.json({ success: true });
 }

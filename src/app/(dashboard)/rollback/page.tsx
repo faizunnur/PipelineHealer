@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -40,31 +39,24 @@ export default function RollbackPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      supabase.from("pipelines").select("id, repo_full_name, provider")
-        .eq("user_id", user.id).then(({ data }) => {
-          setPipelines(data ?? []);
-          if (data?.[0]) {
-            setSelectedPipeline(data[0].id);
-            loadRuns(data[0].id);
-            loadHistory(data[0].id);
-          }
-          setLoading(false);
-        });
-    });
+    fetch("/api/pipelines")
+      .then((r) => r.json())
+      .then(({ pipelines: data }) => {
+        const list = (data ?? []) as Pipeline[];
+        setPipelines(list);
+        if (list[0]) {
+          setSelectedPipeline(list[0].id);
+          loadRuns(list[0].id);
+          loadHistory(list[0].id);
+        }
+        setLoading(false);
+      });
   }, []);
 
   async function loadRuns(pipelineId: string) {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("pipeline_runs")
-      .select("id, status, branch, created_at, commit_sha")
-      .eq("pipeline_id", pipelineId)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    setRuns(data ?? []);
+    const res = await fetch(`/api/pipeline-runs?pipelineId=${pipelineId}`);
+    const data = await res.json();
+    setRuns(data.runs ?? []);
     setSelectedRun("");
     setCommits([]);
     setSelectedSha("");
@@ -81,7 +73,7 @@ export default function RollbackPage() {
     const res = await fetch(`/api/rollback?pipelineId=${selectedPipeline}&runId=${runId}`);
     const data = await res.json();
     setCommits(data.commits ?? []);
-    if (data.commits?.[1]) setSelectedSha(data.commits[1].sha); // default to 1 before HEAD
+    if (data.commits?.[1]) setSelectedSha(data.commits[1].sha);
     setLoadingCommits(false);
   }
 
@@ -131,94 +123,98 @@ export default function RollbackPage() {
         </p>
       </div>
 
-      {/* Rollback Form */}
       <Card>
         <CardHeader><CardTitle className="text-base">Trigger Rollback</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Pipeline</Label>
-              <select value={selectedPipeline}
-                onChange={(e) => handlePipelineChange(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>{p.repo_full_name}</option>
-                ))}
-              </select>
+          {loading ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading pipelines...
             </div>
-            <div className="space-y-2">
-              <Label>Failed Run</Label>
-              <select value={selectedRun}
-                onChange={(e) => handleRunChange(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
-                <option value="">Select a run...</option>
-                {runs.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.branch} · {r.status} · {formatRelativeTime(r.created_at)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {selectedRun && (
-            <div className="space-y-2">
-              <Label>Rollback Target</Label>
-              {loadingCommits ? (
-                <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading commits...
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Pipeline</Label>
+                  <select value={selectedPipeline}
+                    onChange={(e) => handlePipelineChange(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                    {pipelines.map((p) => (
+                      <option key={p.id} value={p.id}>{p.repo_full_name}</option>
+                    ))}
+                  </select>
                 </div>
-              ) : commits.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No commits available. GitHub repos only.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border border-input p-2">
-                  {commits.map((c, i) => (
-                    <label key={c.sha}
-                      className={`flex items-start gap-3 p-2 rounded-md cursor-pointer transition-colors ${selectedSha === c.sha ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"}`}>
-                      <input type="radio" name="sha" value={c.sha}
-                        checked={selectedSha === c.sha}
-                        onChange={() => setSelectedSha(c.sha)}
-                        className="mt-0.5 accent-primary" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <GitCommit className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          <code className="text-xs font-mono text-primary">{c.sha.slice(0, 7)}</code>
-                          {i === 0 && <Badge variant="outline" className="text-xs">HEAD</Badge>}
-                        </div>
-                        <p className="text-xs mt-0.5 truncate">{c.message}</p>
-                        <p className="text-xs text-muted-foreground">{c.author} · {formatRelativeTime(c.date)}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {selectedSha && (
-            <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
-                <div className="text-xs">
-                  <p className="font-medium text-warning">This will create a new commit reverting to <code className="font-mono">{selectedSha.slice(0, 7)}</code>.</p>
-                  <p className="text-muted-foreground mt-0.5">This is non-destructive — git history is preserved. The rollback creates a new commit on top.</p>
+                <div className="space-y-2">
+                  <Label>Failed Run</Label>
+                  <select value={selectedRun}
+                    onChange={(e) => handleRunChange(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                    <option value="">Select a run...</option>
+                    {runs.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.branch} · {r.status} · {formatRelativeTime(r.created_at)}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-            </div>
-          )}
 
-          <Button onClick={handleRollback}
-            disabled={!selectedPipeline || !selectedRun || !selectedSha || rolling}
-            variant="destructive" className="gap-2">
-            {rolling ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            {rolling ? "Rolling back..." : "Execute Rollback"}
-          </Button>
+              {selectedRun && (
+                <div className="space-y-2">
+                  <Label>Rollback Target</Label>
+                  {loadingCommits ? (
+                    <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Loading commits...
+                    </div>
+                  ) : commits.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No commits available. GitHub repos only.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border border-input p-2">
+                      {commits.map((c, i) => (
+                        <label key={c.sha}
+                          className={`flex items-start gap-3 p-2 rounded-md cursor-pointer transition-colors ${selectedSha === c.sha ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50"}`}>
+                          <input type="radio" name="sha" value={c.sha}
+                            checked={selectedSha === c.sha}
+                            onChange={() => setSelectedSha(c.sha)}
+                            className="mt-0.5 accent-primary" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <GitCommit className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                              <code className="text-xs font-mono text-primary">{c.sha.slice(0, 7)}</code>
+                              {i === 0 && <Badge variant="outline" className="text-xs">HEAD</Badge>}
+                            </div>
+                            <p className="text-xs mt-0.5 truncate">{c.message}</p>
+                            <p className="text-xs text-muted-foreground">{c.author} · {formatRelativeTime(c.date)}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedSha && (
+                <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <p className="font-medium text-warning">This will create a new commit reverting to <code className="font-mono">{selectedSha.slice(0, 7)}</code>.</p>
+                      <p className="text-muted-foreground mt-0.5">This is non-destructive — git history is preserved. The rollback creates a new commit on top.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <Button onClick={handleRollback}
+                disabled={!selectedPipeline || !selectedRun || !selectedSha || rolling}
+                variant="destructive" className="gap-2">
+                {rolling ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                {rolling ? "Rolling back..." : "Execute Rollback"}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
-      {/* History */}
       <div>
         <h2 className="text-sm font-semibold mb-3">Rollback History</h2>
         {history.length === 0 ? (

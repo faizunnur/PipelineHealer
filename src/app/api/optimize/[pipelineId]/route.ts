@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto/decrypt";
 import { fetchWorkflowContent } from "@/lib/github/workflow-updater";
@@ -15,23 +15,28 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId } = await params;
+  const db = createAdminClient();
 
   // Check token budget
-  const { data: profile } = await supabase
-    .from("profiles").select("tokens_used,token_budget").eq("id", user.id).single();
+  const { data: profile } = await db
+    .from("profiles")
+    .select("tokens_used, token_budget")
+    .eq("id", session.userId)
+    .single();
   if (profile && profile.tokens_used >= profile.token_budget) {
     return NextResponse.json({ error: "Token budget exceeded" }, { status: 429 });
   }
 
-  const { data: pipeline } = await supabase
+  const { data: pipeline } = await db
     .from("pipelines")
     .select("*, integrations(encrypted_token, token_iv, token_tag)")
-    .eq("id", pipelineId).eq("user_id", user.id).single();
+    .eq("id", pipelineId)
+    .eq("user_id", session.userId)
+    .single();
 
   if (!pipeline) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -42,7 +47,6 @@ export async function POST(
 
   const token = decrypt({ encrypted: integration.encrypted_token, iv: integration.token_iv, tag: integration.token_tag });
 
-  // Find workflow file
   let workflowContent: string | null = null;
   let workflowPath = "";
   for (const path of COMMON_WORKFLOW_PATHS) {
@@ -58,16 +62,13 @@ export async function POST(
     workflowContent, pipeline.provider as "github" | "gitlab", pipeline.repo_full_name
   );
 
-  const adminClient = createAdminClient();
-  // Delete old suggestions for this pipeline
-  await adminClient.from("performance_suggestions").delete().eq("pipeline_id", pipelineId);
+  await db.from("performance_suggestions").delete().eq("pipeline_id", pipelineId);
 
-  // Insert new suggestions
   if (suggestions.length > 0) {
-    await adminClient.from("performance_suggestions").insert(
+    await db.from("performance_suggestions").insert(
       suggestions.map((s) => ({
         pipeline_id: pipelineId,
-        user_id: user.id,
+        user_id: session.userId,
         category: s.category,
         title: s.title,
         description: s.description,
@@ -80,12 +81,11 @@ export async function POST(
     );
   }
 
-  // Log token usage
-  await adminClient.from("token_usage_log").insert({
-    user_id: user.id, feature: "healing", model: "claude-sonnet-4-6",
+  await db.from("token_usage_log").insert({
+    user_id: session.userId, feature: "healing", model: "claude-sonnet-4-6",
     tokens_in: Math.floor(tokens_used * 0.7), tokens_out: Math.floor(tokens_used * 0.3),
   });
-  await supabase.rpc("increment_token_usage", { p_user_id: user.id, p_amount: tokens_used });
+  await db.rpc("increment_token_usage", { p_user_id: session.userId, p_amount: tokens_used });
 
   return NextResponse.json({ suggestions, workflow_path: workflowPath, tokens_used });
 }
@@ -94,14 +94,17 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId } = await params;
-  const { data } = await supabase
+  const db = createAdminClient();
+
+  const { data } = await db
     .from("performance_suggestions")
-    .select("*").eq("pipeline_id", pipelineId).eq("user_id", user.id)
+    .select("*")
+    .eq("pipeline_id", pipelineId)
+    .eq("user_id", session.userId)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({ suggestions: data ?? [] });
@@ -111,16 +114,18 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId } = await params;
   const body = await req.json();
+  const db = createAdminClient();
 
-  await supabase.from("performance_suggestions")
+  await db
+    .from("performance_suggestions")
     .update({ status: body.status })
-    .eq("id", body.id).eq("user_id", user.id);
+    .eq("id", body.id)
+    .eq("user_id", session.userId);
 
   return NextResponse.json({ ok: true });
 }

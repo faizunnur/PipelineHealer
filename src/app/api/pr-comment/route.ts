@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-
 import { postPRComment, findPRForCommit } from "@/lib/github/pr-commenter";
 import { decrypt } from "@/lib/crypto/decrypt";
 
-// POST /api/pr-comment — manually trigger a PR comment for a healing event
 export async function POST(request: NextRequest) {
-  
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { healingEventId } = await request.json();
   if (!healingEventId) return NextResponse.json({ error: "healingEventId required" }, { status: 400 });
 
-  const admin = createAdminClient();
-  const { data: event } = await admin
+  const db = createAdminClient();
+  const { data: event } = await db
     .from("healing_events")
     .select(`*, pipelines(provider, repo_full_name, integrations(encrypted_token, token_iv, token_tag))`)
     .eq("id", healingEventId)
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .single();
 
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -41,8 +37,7 @@ export async function POST(request: NextRequest) {
     tag: pipeline.integrations.token_tag,
   });
 
-  // Get the commit SHA from the run
-  const { data: run } = await admin
+  const { data: run } = await db
     .from("pipeline_runs")
     .select("commit_sha")
     .eq("id", event.run_id)

@@ -14,7 +14,9 @@ export type Json =
 type ProfileRow = {
   id: string; email: string; full_name: string | null; avatar_url: string | null;
   role: "user" | "admin"; is_suspended: boolean; approval_mode: "manual" | "auto";
-  token_budget: number; tokens_used: number; created_at: string; updated_at: string;
+  token_budget: number; tokens_used: number; password_hash: string | null;
+  email_verified: boolean;
+  created_at: string; updated_at: string;
 };
 type IntegrationRow = {
   id: string; user_id: string; provider: "github" | "gitlab"; provider_user: string;
@@ -225,6 +227,12 @@ export type Database = {
         { foreignKeyName: "rollback_events_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] },
         { foreignKeyName: "rollback_events_healing_event_id_fkey"; columns: ["healing_event_id"]; referencedRelation: "healing_events"; referencedColumns: ["id"] }
       ]>;
+      password_reset_tokens: TableDef<{
+        id: string; email: string; token: string; expires_at: string; created_at: string;
+      }>;
+      email_verification_tokens: TableDef<{
+        id: string; user_id: string; token: string; expires_at: string; created_at: string;
+      }>;
     };
     // Empty views — empty object satisfies Record<string, GenericView>
     Views: {

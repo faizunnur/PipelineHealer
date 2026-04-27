@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { decrypt } from "@/lib/crypto/decrypt";
 import { fetchWorkflowContent } from "@/lib/github/workflow-updater";
@@ -16,16 +16,18 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId } = await params;
+  const db = createAdminClient();
 
-  const { data: pipeline } = await supabase
+  const { data: pipeline } = await db
     .from("pipelines")
     .select("*, integrations(encrypted_token, token_iv, token_tag)")
-    .eq("id", pipelineId).eq("user_id", user.id).single();
+    .eq("id", pipelineId)
+    .eq("user_id", session.userId)
+    .single();
 
   if (!pipeline) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -36,8 +38,7 @@ export async function POST(
 
   const token = decrypt({ encrypted: integration.encrypted_token, iv: integration.token_iv, tag: integration.token_tag });
 
-  const adminClient = createAdminClient();
-  await adminClient.from("secret_scan_results").delete().eq("pipeline_id", pipelineId);
+  await db.from("secret_scan_results").delete().eq("pipeline_id", pipelineId);
 
   const allFindings = [];
   for (const path of WORKFLOW_PATHS) {
@@ -48,14 +49,14 @@ export async function POST(
   }
 
   if (allFindings.length > 0) {
-    await adminClient.from("secret_scan_results").insert(
-      allFindings.map((f) => ({ ...f, pipeline_id: pipelineId, user_id: user.id, status: "open" }))
+    await db.from("secret_scan_results").insert(
+      allFindings.map((f) => ({ ...f, pipeline_id: pipelineId, user_id: session.userId, status: "open" }))
     );
 
     const criticalCount = allFindings.filter((f) => f.severity === "critical").length;
     const highCount = allFindings.filter((f) => f.severity === "high").length;
     if (criticalCount > 0 || highCount > 0) {
-      await sendNotifications(user.id, {
+      await sendNotifications(session.userId, {
         event: "security_alert",
         title: `Security Alert: ${pipeline.repo_full_name}`,
         message: `Found ${criticalCount} critical and ${highCount} high severity issues in your pipeline workflow files.`,
@@ -76,14 +77,17 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId } = await params;
-  const { data } = await supabase
+  const db = createAdminClient();
+
+  const { data } = await db
     .from("secret_scan_results")
-    .select("*").eq("pipeline_id", pipelineId).eq("user_id", user.id)
+    .select("*")
+    .eq("pipeline_id", pipelineId)
+    .eq("user_id", session.userId)
     .order("severity", { ascending: true });
 
   return NextResponse.json({ findings: data ?? [] });
@@ -93,16 +97,18 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ pipelineId: string }> }
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const { pipelineId } = await params;
+  const db = createAdminClient();
 
-  await supabase.from("secret_scan_results")
+  await db
+    .from("secret_scan_results")
     .update({ status: body.status })
-    .eq("id", body.id).eq("user_id", user.id);
+    .eq("id", body.id)
+    .eq("user_id", session.userId);
 
   return NextResponse.json({ ok: true });
 }

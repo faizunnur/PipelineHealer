@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { streamChatResponse } from "@/lib/claude/chatbot";
 import { z } from "zod";
 
@@ -10,15 +11,16 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = createAdminClient();
 
   // Check token budget
-  const { data: profile } = await supabase
+  const { data: profile } = await db
     .from("profiles")
     .select("tokens_used, token_budget, is_suspended")
-    .eq("id", user.id)
+    .eq("id", session.userId)
     .single();
 
   if (profile?.is_suspended) {
@@ -43,12 +45,9 @@ export async function POST(req: NextRequest) {
   // Get or create session
   let session_id = sessionId;
   if (!session_id) {
-    const { data: newSession } = await supabase
+    const { data: newSession } = await db
       .from("chat_sessions")
-      .insert({
-        user_id: user.id,
-        title: message.slice(0, 60),
-      })
+      .insert({ user_id: session.userId, title: message.slice(0, 60) })
       .select("id")
       .single();
     session_id = newSession?.id;
@@ -59,14 +58,10 @@ export async function POST(req: NextRequest) {
   }
 
   // Save user message
-  await supabase.from("chat_messages").insert({
-    session_id,
-    role: "user",
-    content: message,
-  });
+  await db.from("chat_messages").insert({ session_id, role: "user", content: message });
 
   // Get conversation history (last 10 messages)
-  const { data: history } = await supabase
+  const { data: history } = await db
     .from("chat_messages")
     .select("role, content")
     .eq("session_id", session_id)
@@ -78,7 +73,6 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }));
 
-  // Stream response
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -91,29 +85,25 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(chunk));
         }
 
-        // Estimate tokens
         tokensUsed = Math.ceil((message.length + fullResponse.length) / 4);
 
-        // Save assistant message
-        await supabase.from("chat_messages").insert({
+        await db.from("chat_messages").insert({
           session_id,
           role: "assistant",
           content: fullResponse,
           tokens_used: tokensUsed,
         });
 
-        // Log token usage
-        await supabase.from("token_usage_log").insert({
-          user_id: user.id,
+        await db.from("token_usage_log").insert({
+          user_id: session.userId,
           feature: "chat",
           model: "claude-haiku-4-5-20251001",
           tokens_in: Math.ceil(message.length / 4),
           tokens_out: Math.ceil(fullResponse.length / 4),
         });
 
-        // Increment counter
-        await supabase.rpc("increment_token_usage", {
-          p_user_id: user.id,
+        await db.rpc("increment_token_usage", {
+          p_user_id: session.userId,
           p_amount: tokensUsed,
         });
       } catch (err) {

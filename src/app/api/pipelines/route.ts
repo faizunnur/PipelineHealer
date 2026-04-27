@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -11,18 +12,18 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data } = await supabase
+  const db = createAdminClient();
+  const { data } = await db
     .from("pipelines")
     .select(
       `id, provider, repo_full_name, pipeline_name, default_branch,
        is_monitored, last_status, created_at, updated_at,
        pipeline_runs(id, status, branch, commit_sha, created_at)`
     )
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("updated_at", { ascending: false })
     .limit(1, { referencedTable: "pipeline_runs" });
 
@@ -30,38 +31,33 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid data", details: parsed.error.flatten() },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  const db = createAdminClient();
+
   // Verify integration ownership
-  const { data: integration } = await supabase
+  const { data: integration } = await db
     .from("integrations")
     .select("id")
     .eq("id", parsed.data.integrationId)
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .single();
 
   if (!integration) {
-    return NextResponse.json(
-      { error: "Integration not found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Integration not found" }, { status: 404 });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("pipelines")
     .insert({
-      user_id: user.id,
+      user_id: session.userId,
       integration_id: parsed.data.integrationId,
       provider: parsed.data.provider,
       repo_full_name: parsed.data.repoFullName,
@@ -72,6 +68,5 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ pipeline: data }, { status: 201 });
 }

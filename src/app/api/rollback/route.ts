@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-
 import { orchestrateRollback, fetchRecentCommits } from "@/lib/rollback/rollback-manager";
 import { decrypt } from "@/lib/crypto/decrypt";
 
-// GET /api/rollback?pipelineId=&runId= — get recent commits + rollback history
 export async function GET(request: NextRequest) {
-  
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
   const pipelineId = searchParams.get("pipelineId");
@@ -18,25 +14,23 @@ export async function GET(request: NextRequest) {
 
   if (!pipelineId) return NextResponse.json({ error: "pipelineId required" }, { status: 400 });
 
-  const admin = createAdminClient();
+  const db = createAdminClient();
 
-  // Get rollback history for this pipeline
-  const { data: history } = await admin
+  const { data: history } = await db
     .from("rollback_events")
     .select("*")
     .eq("pipeline_id", pipelineId)
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("created_at", { ascending: false })
     .limit(20);
 
-  // If runId provided, fetch available commits for rollback
   let commits: Array<{ sha: string; message: string; date: string; author: string }> = [];
   if (runId) {
-    const { data: pipeline } = await admin
+    const { data: pipeline } = await db
       .from("pipelines")
       .select("repo_full_name, provider, integrations(encrypted_token, token_iv, token_tag)")
       .eq("id", pipelineId)
-      .eq("user_id", user.id)
+      .eq("user_id", session.userId)
       .single();
 
     const pipelineData = pipeline as {
@@ -46,7 +40,7 @@ export async function GET(request: NextRequest) {
     } | null;
 
     if (pipelineData?.provider === "github") {
-      const { data: run } = await admin
+      const { data: run } = await db
         .from("pipeline_runs")
         .select("branch, commit_sha")
         .eq("id", runId)
@@ -70,12 +64,9 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ history: history ?? [], commits });
 }
 
-// POST /api/rollback — trigger a rollback
 export async function POST(request: NextRequest) {
-  
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { pipelineId, runId, targetSha, reason } = await request.json();
   if (!pipelineId || !runId || !targetSha) {
@@ -83,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await orchestrateRollback(
-    user.id,
+    session.userId,
     pipelineId,
     runId,
     targetSha,

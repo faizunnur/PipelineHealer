@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { encrypt } from "@/lib/crypto/encrypt";
 import { z } from "zod";
 
@@ -12,23 +13,22 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data } = await supabase
+  const db = createAdminClient();
+  const { data } = await db
     .from("notification_channels")
     .select("id, name, type, email_address, events, is_active, created_at")
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("created_at", { ascending: false });
 
   return NextResponse.json({ channels: data ?? [] });
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const parsed = createSchema.safeParse(body);
@@ -39,14 +39,13 @@ export async function POST(req: NextRequest) {
   const { name, type, webhookUrl, emailAddress, events } = parsed.data;
 
   let encryptedWebhook: { encrypted: string; iv: string; tag: string } | null = null;
-  if (webhookUrl) {
-    encryptedWebhook = encrypt(webhookUrl);
-  }
+  if (webhookUrl) encryptedWebhook = encrypt(webhookUrl);
 
-  const { data, error } = await supabase
+  const db = createAdminClient();
+  const { data, error } = await db
     .from("notification_channels")
     .insert({
-      user_id: user.id,
+      user_id: session.userId,
       name,
       type,
       webhook_url: encryptedWebhook?.encrypted ?? null,

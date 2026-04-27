@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -42,18 +41,15 @@ export default function SLAPage() {
   });
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      Promise.all([
-        fetch("/api/sla").then((r) => r.json()),
-        supabase.from("pipelines").select("id, repo_full_name").eq("user_id", user.id),
-      ]).then(([slaData, pipelineData]) => {
-        setRules(slaData.rules ?? []);
-        setPipelines(pipelineData.data ?? []);
-        if (pipelineData.data?.[0]) setForm((f) => ({ ...f, pipeline_id: pipelineData.data![0].id }));
-        setLoading(false);
-      });
+    Promise.all([
+      fetch("/api/sla").then((r) => r.json()),
+      fetch("/api/pipelines").then((r) => r.json()),
+    ]).then(([slaData, pipelineData]) => {
+      setRules(slaData.rules ?? []);
+      const pl = pipelineData.pipelines ?? [];
+      setPipelines(pl);
+      if (pl[0]) setForm((f) => ({ ...f, pipeline_id: pl[0].id }));
+      setLoading(false);
     });
   }, []);
 

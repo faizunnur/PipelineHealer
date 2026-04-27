@@ -1,46 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
-async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+async function requireAdmin() {
+  const session = await getSession();
+  if (!session) return null;
 
-  const { data: profile } = await supabase
+  const db = createAdminClient();
+  const { data: profile } = await db
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", session.userId)
     .single();
 
   if (profile?.role !== "admin") return null;
-  return user;
+  return session;
 }
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const adminUser = await requireAdmin(supabase);
-  if (!adminUser) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminSession = await requireAdmin();
+  if (!adminSession) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const url = new URL(req.url);
   const page = parseInt(url.searchParams.get("page") ?? "1");
   const limit = parseInt(url.searchParams.get("limit") ?? "20");
   const offset = (page - 1) * limit;
 
-  const adminClient = createAdminClient();
-
-  const { data, count } = await adminClient
+  const db = createAdminClient();
+  const { data, count } = await db
     .from("profiles")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  return NextResponse.json({
-    users: data ?? [],
-    total: count ?? 0,
-    page,
-    limit,
-  });
+  return NextResponse.json({ users: data ?? [], total: count ?? 0, page, limit });
 }
 
 const updateSchema = z.object({
@@ -51,9 +45,8 @@ const updateSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
-  const supabase = await createClient();
-  const adminUser = await requireAdmin(supabase);
-  if (!adminUser) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const adminSession = await requireAdmin();
+  if (!adminSession) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const url = new URL(req.url);
   const userId = url.searchParams.get("userId");
@@ -65,8 +58,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid data" }, { status: 400 });
   }
 
-  const adminClient = createAdminClient();
-  const { data, error } = await adminClient
+  const db = createAdminClient();
+  const { data, error } = await db
     .from("profiles")
     .update(parsed.data)
     .eq("id", userId)
@@ -74,6 +67,5 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ user: data });
 }

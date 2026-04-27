@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Plus, GitBranch, Github, Gitlab } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,18 +10,18 @@ import { formatRelativeTime, truncateCommitMessage, truncateCommitSha } from "@/
 export const dynamic = "force-dynamic";
 
 export default async function PipelinesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await getSession();
+  if (!session) return null;
 
-  const { data: pipelines } = await supabase
+  const db = createAdminClient();
+  const { data: pipelines } = await db
     .from("pipelines")
     .select(
       `id, provider, repo_full_name, pipeline_name, default_branch,
        is_monitored, last_status, updated_at,
        pipeline_runs(id, status, branch, commit_sha, commit_message, created_at, triggered_by)`
     )
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("updated_at", { ascending: false });
 
   return (

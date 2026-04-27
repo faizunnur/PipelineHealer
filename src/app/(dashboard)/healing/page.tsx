@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Wrench, CheckCircle2, XCircle, Clock, Bot } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,18 +9,18 @@ import { formatRelativeTime } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function HealingPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await getSession();
+  if (!session) return null;
 
-  const { data: events } = await supabase
+  const db = createAdminClient();
+  const { data: events } = await db
     .from("healing_events")
     .select(
       `id, status, ai_reason, ai_tokens_used, approval_mode, created_at,
        pipelines(repo_full_name, provider),
        pipeline_jobs(job_name)`
     )
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("created_at", { ascending: false })
     .limit(50);
 

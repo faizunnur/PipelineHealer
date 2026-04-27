@@ -7,7 +7,6 @@ import { Zap, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 function LoginForm() {
@@ -24,23 +23,32 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
 
     setLoading(false);
 
-    if (error) {
-      toast({
-        title: "Sign in failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
+    if (res.ok) {
       router.push(redirectTo);
       router.refresh();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      if (data.error === "email_not_verified") {
+        toast({
+          title: "Email not verified",
+          description: "Please check your inbox and click the verification link before signing in.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sign in failed",
+          description: data.error ?? "Something went wrong",
+          variant: "destructive",
+        });
+      }
     }
   }
 
@@ -106,10 +114,7 @@ function LoginForm() {
 
       <p className="text-center text-sm text-muted-foreground mt-6">
         Don&apos;t have an account?{" "}
-        <Link
-          href="/register"
-          className="text-primary hover:underline font-medium"
-        >
+        <Link href="/register" className="text-primary hover:underline font-medium">
           Create one free
         </Link>
       </p>
@@ -120,21 +125,17 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 bg-background">
-      {/* Background gradient */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md animate-fade-up">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
               <Zap className="w-5 h-5 text-primary" />
             </div>
-            <span className="font-bold text-xl gradient-text">
-              PipelineHealer
-            </span>
+            <span className="font-bold text-xl gradient-text">PipelineHealer</span>
           </Link>
           <h1 className="mt-6 text-2xl font-bold">Welcome back</h1>
           <p className="text-muted-foreground text-sm mt-1">

@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { createClient } from "@/lib/supabase/client";
 import { formatRelativeTime } from "@/lib/utils";
 
 type Org = {
@@ -49,9 +48,8 @@ export default function OrgsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setCurrentUserId(user.id);
+    fetch("/api/profile").then((r) => r.json()).then(({ profile }) => {
+      if (profile?.id) setCurrentUserId(profile.id);
     });
     loadOrgs();
   }, []);

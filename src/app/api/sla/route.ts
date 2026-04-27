@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -12,17 +13,17 @@ const createSchema = z.object({
 });
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
   const pipelineId = url.searchParams.get("pipelineId");
 
-  let query = supabase
+  const db = createAdminClient();
+  let query = db
     .from("sla_rules")
     .select(`*, pipelines(repo_full_name), sla_violations(id, actual_value, threshold, created_at)`)
-    .eq("user_id", user.id);
+    .eq("user_id", session.userId);
 
   if (pipelineId) query = query.eq("pipeline_id", pipelineId);
 
@@ -31,9 +32,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
   const parsed = createSchema.safeParse(body);
@@ -41,14 +41,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 400 });
   }
 
+  const db = createAdminClient();
+
   // Verify pipeline ownership
-  const { data: pipeline } = await supabase
-    .from("pipelines").select("id").eq("id", parsed.data.pipeline_id).eq("user_id", user.id).single();
+  const { data: pipeline } = await db
+    .from("pipelines")
+    .select("id")
+    .eq("id", parsed.data.pipeline_id)
+    .eq("user_id", session.userId)
+    .single();
   if (!pipeline) return NextResponse.json({ error: "Pipeline not found" }, { status: 404 });
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("sla_rules")
-    .insert({ ...parsed.data, user_id: user.id })
+    .insert({ ...parsed.data, user_id: session.userId })
     .select()
     .single();
 
@@ -57,13 +63,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
+  const db = createAdminClient();
 
-  await supabase.from("sla_rules").delete().eq("id", id!).eq("user_id", user.id);
+  await db.from("sla_rules").delete().eq("id", id!).eq("user_id", session.userId);
   return NextResponse.json({ ok: true });
 }

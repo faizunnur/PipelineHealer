@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import Link from "next/link";
 import { Plus, Github, Gitlab, Trash2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,14 +10,14 @@ import { DeleteIntegrationButton } from "@/components/integrations/DeleteIntegra
 export const dynamic = "force-dynamic";
 
 export default async function IntegrationsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await getSession();
+  if (!session) return null;
 
-  const { data: integrations } = await supabase
+  const db = createAdminClient();
+  const { data: integrations } = await db
     .from("integrations")
     .select("id, provider, provider_user, is_active, created_at, webhook_secret")
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .order("created_at", { ascending: false });
 
   return (

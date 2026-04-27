@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { getSession } from "@/lib/auth/session";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Github, Gitlab, GitCommit, Clock, User } from "lucide-react";
@@ -20,20 +21,20 @@ export default async function PipelineDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await getSession();
+  if (!session) return null;
 
-  const { data: pipeline } = await supabase
+  const db = createAdminClient();
+  const { data: pipeline } = await db
     .from("pipelines")
     .select("*")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", session.userId)
     .single();
 
   if (!pipeline) notFound();
 
-  const { data: runs } = await supabase
+  const { data: runs } = await db
     .from("pipeline_runs")
     .select(
       `id, status, branch, commit_sha, commit_message, triggered_by,
