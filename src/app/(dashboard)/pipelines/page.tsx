@@ -34,7 +34,7 @@ export default async function PipelinesPage() {
           </p>
         </div>
         <Button asChild size="sm">
-          <Link href="/integrations/new">
+          <Link href="/pipelines/new">
             <Plus className="w-4 h-4" />
             Add Pipeline
           </Link>
@@ -47,10 +47,10 @@ export default async function PipelinesPage() {
             <GitBranch className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
             <p className="font-medium mb-1">No pipelines yet</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Connect GitHub or GitLab to start monitoring pipelines
+              Add a repository to start monitoring its CI/CD pipelines
             </p>
             <Button asChild>
-              <Link href="/integrations/new">
+              <Link href="/pipelines/new">
                 <Plus className="w-4 h-4" />
                 Add First Pipeline
               </Link>
