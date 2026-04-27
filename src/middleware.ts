@@ -29,6 +29,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages
   if (session && (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";

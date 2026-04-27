@@ -25,6 +25,7 @@ import {
   LayoutTemplate,
   ShieldCheck,
   Building2,
+  FolderCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -49,6 +50,7 @@ const navGroups: NavGroup[] = [
       { href: "/pipelines", label: "Pipelines", icon: GitBranch },
       { href: "/healing", label: "Healing Events", icon: Wrench },
       { href: "/integrations", label: "Integrations", icon: Plug },
+      { href: "/repos", label: "Code Browser", icon: FolderCode },
       { href: "/chat", label: "AI Assistant", icon: MessageSquare },
     ],
   },
