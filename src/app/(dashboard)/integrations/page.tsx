@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteIntegrationButton } from "@/components/integrations/DeleteIntegrationButton";
+import { WebhookSecretCopy } from "@/components/integrations/WebhookSecretCopy";
+
 
 export const dynamic = "force-dynamic";
 
@@ -130,16 +132,5 @@ export default async function IntegrationsPage() {
         ))}
       </div>
     </div>
-  );
-}
-
-function WebhookSecretCopy({ secret }: { secret: string }) {
-  return (
-    <button
-      onClick={() => navigator.clipboard.writeText(secret)}
-      className="ml-2 text-primary hover:underline text-xs"
-    >
-      Copy full secret
-    </button>
   );
 }
