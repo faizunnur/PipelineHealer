@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     .select("*, profiles(email, full_name)")
     .order("created_at", { ascending: false });
 
-  if (status && status !== "all") query = query.eq("status", status);
+  if (status && status !== "all") query = query.eq("status", status as "pending" | "approved" | "rejected");
 
   const { data } = await query;
   return NextResponse.json({ templates: data ?? [] });
