@@ -21,8 +21,14 @@ export async function PUT(
   const body = await req.json();
   const { name, title, description, category, provider, content, tags, is_featured, is_official, status } = body;
 
+  type TemplateUpdate = {
+    name?: string; title?: string; description?: string; category?: string;
+    provider?: string; content?: string; tags?: string[];
+    is_featured?: boolean; is_official?: boolean;
+    status?: "pending" | "approved" | "rejected";
+  };
   const db = createAdminClient();
-  const update: Record<string, unknown> = {};
+  const update: TemplateUpdate = {};
   if (name !== undefined) { update.name = name; update.title = title ?? name; }
   if (description !== undefined) update.description = description;
   if (category !== undefined) update.category = category;
