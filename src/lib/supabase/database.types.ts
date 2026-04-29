@@ -27,6 +27,7 @@ type PipelineRow = {
   id: string; user_id: string; integration_id: string; provider: "github" | "gitlab";
   repo_full_name: string; pipeline_name: string; default_branch: string;
   is_monitored: boolean; last_run_id: string | null; last_status: string | null;
+  webhook_status: "created" | "exists" | "failed" | "skipped" | null;
   created_at: string; updated_at: string;
 };
 type PipelineRunRow = {
@@ -107,6 +108,7 @@ type PipelineTemplateRow = {
   provider: "github" | "gitlab" | "both"; language: string | null; content: string;
   variables: Json; tags: string[]; use_count: number; is_featured: boolean;
   is_official: boolean; created_by: string | null; author_id: string | null;
+  status: "pending" | "approved" | "rejected";
   created_at: string; updated_at: string | null;
 };
 type EnvVarAuditRow = {

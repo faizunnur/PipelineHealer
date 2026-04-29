@@ -81,11 +81,15 @@ export async function POST(
     }
 
     await db.from("env_var_audits").delete().eq("pipeline_id", pipelineId);
+
+    let savedFindings: unknown[] = [];
     if (allFindings.length > 0) {
-      await db.from("env_var_audits").insert(allFindings);
+      const { data } = await db.from("env_var_audits").insert(allFindings).select();
+      savedFindings = data ?? [];
     }
 
     return NextResponse.json({
+      findings: savedFindings,
       scanned: yamlFiles.length,
       totalFindings: allFindings.length,
       critical: allFindings.filter((f) => f.severity === "critical").length,

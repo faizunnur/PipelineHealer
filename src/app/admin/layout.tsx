@@ -8,12 +8,14 @@ import {
   Settings,
   Zap,
   ArrowLeft,
+  LayoutTemplate,
 } from "lucide-react";
 import Link from "next/link";
 
 const adminNavItems = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/admin/usage", label: "Usage", icon: BarChart3 },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];

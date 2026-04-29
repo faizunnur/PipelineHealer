@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatRelativeTime, truncateCommitMessage, truncateCommitSha } from "@/lib/utils";
+import { DeletePipelineButton } from "@/components/pipelines/DeletePipelineButton";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,11 @@ export default async function PipelinesPage() {
                   <Button variant="outline" size="sm" asChild>
                     <Link href={`/pipelines/${pipeline.id}`}>View</Link>
                   </Button>
+                  <DeletePipelineButton
+                    pipelineId={pipeline.id}
+                    repoName={pipeline.repo_full_name}
+                    variant="icon"
+                  />
                 </div>
               </CardContent>
             </Card>

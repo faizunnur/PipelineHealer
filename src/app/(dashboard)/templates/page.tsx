@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LayoutTemplate, Search, Star, Download, Plus, Github, Gitlab, Loader2, Code2, Tag, X } from "lucide-react";
+import {
+  LayoutTemplate, Search, Star, Download, Plus, Github, Gitlab,
+  Loader2, Code2, Tag, X, Rocket, Copy, CheckCircle2,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +16,10 @@ type Template = {
   id: string; name: string; description: string; category: string;
   provider: string; content: string; tags: string[]; use_count: number;
   is_official: boolean; author_id: string | null;
+};
+
+type Pipeline = {
+  id: string; repo_full_name: string; provider: string; default_branch: string;
 };
 
 const CATEGORIES = [
@@ -37,19 +44,24 @@ export default function TemplatesPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Template | null>(null);
   const [showSubmit, setShowSubmit] = useState(false);
+  const [showApply, setShowApply] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applyTemplate, setApplyTemplate] = useState<Template | null>(null);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [applyPipelineId, setApplyPipelineId] = useState("");
+  const [applyFileName, setApplyFileName] = useState("");
+  const [applyMode, setApplyMode] = useState<"auto" | "manual">("auto");
+  const [copiedManual, setCopiedManual] = useState(false);
   const [form, setForm] = useState({
     name: "", description: "", category: "ci", provider: "github", content: "", tags: "",
   });
 
   useEffect(() => {
-    // Seed official templates on first load
     fetch("/api/templates/seed").catch(() => {});
   }, []);
 
-  useEffect(() => {
-    loadTemplates();
-  }, [category, search]);
+  useEffect(() => { loadTemplates(); }, [category, search]);
 
   async function loadTemplates() {
     setLoading(true);
@@ -59,6 +71,57 @@ export default function TemplatesPage() {
     const data = await res.json();
     setTemplates(data.templates ?? []);
     setLoading(false);
+  }
+
+  async function loadPipelines() {
+    const res = await fetch("/api/pipelines");
+    const data = await res.json();
+    setPipelines(data.pipelines ?? []);
+  }
+
+  function openApply(t: Template) {
+    setApplyTemplate(t);
+    setApplyPipelineId("");
+    setApplyFileName(t.provider === "gitlab" ? ".gitlab-ci.yml" : `${t.name.toLowerCase().replace(/\s+/g, "-")}.yml`);
+    setApplyMode("auto");
+    setCopiedManual(false);
+    setShowApply(true);
+    loadPipelines();
+  }
+
+  async function handleApply() {
+    if (!applyTemplate) return;
+    if (applyMode === "auto" && !applyPipelineId) {
+      toast({ title: "Select a pipeline first", variant: "destructive" });
+      return;
+    }
+
+    if (applyMode === "manual") {
+      await navigator.clipboard.writeText(applyTemplate.content);
+      setCopiedManual(true);
+      toast({ title: "Copied!", description: "Paste the YAML into your repository manually." });
+      return;
+    }
+
+    setApplying(true);
+    const res = await fetch(`/api/templates/${applyTemplate.id}/apply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineId: applyPipelineId, fileName: applyFileName, mode: "auto" }),
+    });
+    setApplying(false);
+
+    if (res.ok) {
+      const { filePath, branch } = await res.json();
+      toast({
+        title: "Template applied!",
+        description: `Committed to ${filePath} on branch ${branch}.`,
+      });
+      setShowApply(false);
+    } else {
+      const d = await res.json();
+      toast({ title: "Apply failed", description: d.error, variant: "destructive" });
+    }
   }
 
   async function handleCopy(template: Template) {
@@ -82,15 +145,19 @@ export default function TemplatesPage() {
     });
     setSubmitting(false);
     if (res.ok) {
-      toast({ title: "Template submitted!", description: "Your template has been added to the marketplace." });
+      toast({
+        title: "Template submitted!",
+        description: "Your template is under review and will appear once approved by an admin.",
+      });
       setShowSubmit(false);
       setForm({ name: "", description: "", category: "ci", provider: "github", content: "", tags: "" });
-      loadTemplates();
     } else {
       const d = await res.json();
       toast({ title: "Failed", description: d.error, variant: "destructive" });
     }
   }
+
+  const selectedPipeline = pipelines.find((p) => p.id === applyPipelineId);
 
   return (
     <div className="p-6 max-w-6xl space-y-6">
@@ -101,11 +168,11 @@ export default function TemplatesPage() {
             <LayoutTemplate className="w-6 h-6 text-primary" /> Template Marketplace
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Ready-to-use pipeline templates — copy, customize, and ship
+            Ready-to-use pipeline templates — apply directly to your repo or copy and customize
           </p>
         </div>
         <Button onClick={() => setShowSubmit(true)} className="gap-2">
-          <Plus className="w-4 h-4" /> Submit Template
+          <Plus className="w-4 h-4" /> Contribute Template
         </Button>
       </div>
 
@@ -189,7 +256,7 @@ export default function TemplatesPage() {
       {selected && (
         <Card className="border-primary/30">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-primary" /> {selected.name}
               </CardTitle>
@@ -197,8 +264,11 @@ export default function TemplatesPage() {
                 <Button size="sm" variant="outline" onClick={() => setSelected(null)}>
                   <X className="w-4 h-4" />
                 </Button>
-                <Button size="sm" className="gap-2" onClick={() => handleCopy(selected)}>
-                  <Download className="w-4 h-4" /> Copy Template
+                <Button size="sm" variant="outline" className="gap-2" onClick={() => handleCopy(selected)}>
+                  <Copy className="w-4 h-4" /> Copy
+                </Button>
+                <Button size="sm" className="gap-2" onClick={() => openApply(selected)}>
+                  <Rocket className="w-4 h-4" /> Apply to Pipeline
                 </Button>
               </div>
             </div>
@@ -219,17 +289,145 @@ export default function TemplatesPage() {
         </Card>
       )}
 
-      {/* Submit modal */}
+      {/* Apply to Pipeline modal */}
+      {showApply && applyTemplate && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h2 className="font-semibold flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-primary" /> Apply Template
+              </h2>
+              <button onClick={() => setShowApply(false)} className="p-1 rounded hover:bg-muted transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-5">
+              <p className="text-sm text-muted-foreground">
+                Applying <strong className="text-foreground">{applyTemplate.name}</strong> to a pipeline
+              </p>
+
+              {/* Mode selector */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setApplyMode("auto")}
+                  className={`p-3 rounded-lg border text-left transition-colors ${applyMode === "auto" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                >
+                  <p className="font-medium text-sm">Automatic</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Commits the file directly to your repository
+                  </p>
+                </button>
+                <button
+                  onClick={() => setApplyMode("manual")}
+                  className={`p-3 rounded-lg border text-left transition-colors ${applyMode === "manual" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
+                >
+                  <p className="font-medium text-sm">Manual Copy</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Copy YAML and add to your repo yourself
+                  </p>
+                </button>
+              </div>
+
+              {applyMode === "auto" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Pipeline / Repository</Label>
+                    <select
+                      value={applyPipelineId}
+                      onChange={(e) => {
+                        setApplyPipelineId(e.target.value);
+                        const p = pipelines.find((p) => p.id === e.target.value);
+                        if (p?.provider === "gitlab") setApplyFileName(".gitlab-ci.yml");
+                      }}
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">Select a pipeline…</option>
+                      {pipelines.map((p) => (
+                        <option key={p.id} value={p.id}>{p.repo_full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>
+                      File name
+                      {selectedPipeline?.provider === "github" && (
+                        <span className="text-xs text-muted-foreground ml-1">
+                          (will be placed in <code>.github/workflows/</code>)
+                        </span>
+                      )}
+                    </Label>
+                    <Input
+                      value={applyFileName}
+                      onChange={(e) => setApplyFileName(e.target.value)}
+                      placeholder={selectedPipeline?.provider === "github" ? "ci.yml" : ".gitlab-ci.yml"}
+                    />
+                  </div>
+
+                  {selectedPipeline && (
+                    <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2.5">
+                      Will commit to <strong>{selectedPipeline.repo_full_name}</strong> on branch{" "}
+                      <strong>{selectedPipeline.default_branch}</strong>
+                    </p>
+                  )}
+                </>
+              )}
+
+              {applyMode === "manual" && (
+                <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1.5">
+                  <p className="font-medium text-sm">Instructions</p>
+                  <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Click Copy below to copy the YAML</li>
+                    <li>
+                      In your repo, create the file at:
+                      <code className="ml-1 bg-muted px-1.5 py-0.5 rounded">
+                        {applyTemplate.provider === "github"
+                          ? ".github/workflows/pipeline.yml"
+                          : ".gitlab-ci.yml"}
+                      </code>
+                    </li>
+                    <li>Paste the YAML and commit</li>
+                  </ol>
+                </div>
+              )}
+
+              <div className="flex gap-3 justify-end pt-1">
+                <Button variant="outline" onClick={() => setShowApply(false)}>Cancel</Button>
+                <Button
+                  onClick={handleApply}
+                  disabled={applying || (applyMode === "auto" && !applyPipelineId)}
+                  className="gap-2"
+                >
+                  {applying ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Applying…</>
+                  ) : copiedManual ? (
+                    <><CheckCircle2 className="w-4 h-4" /> Copied!</>
+                  ) : applyMode === "manual" ? (
+                    <><Copy className="w-4 h-4" /> Copy YAML</>
+                  ) : (
+                    <><Rocket className="w-4 h-4" /> Apply Now</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit / Contribute modal */}
       {showSubmit && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Submit a Template</CardTitle>
+                <CardTitle>Contribute a Template</CardTitle>
                 <Button variant="ghost" size="sm" onClick={() => setShowSubmit(false)}>
                   <X className="w-4 h-4" />
                 </Button>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Your template will be reviewed by an admin before it appears in the marketplace.
+              </p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -280,7 +478,7 @@ export default function TemplatesPage() {
                   <Button type="button" variant="outline" onClick={() => setShowSubmit(false)}>Cancel</Button>
                   <Button type="submit" disabled={submitting} className="gap-2">
                     {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Submit Template
+                    Submit for Review
                   </Button>
                 </div>
               </form>

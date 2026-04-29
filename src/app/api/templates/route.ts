@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("pipeline_templates")
     .select("*")
+    .eq("status", "approved")
     .order("use_count", { ascending: false });
 
   if (category && category !== "all") query = query.eq("category", category);
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       author_id: session.userId,
       is_official: false,
       use_count: 0,
+      status: "pending",
     })
     .select()
     .single();

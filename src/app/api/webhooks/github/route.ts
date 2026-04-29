@@ -13,6 +13,11 @@ import {
 } from "@/lib/github/workflow-updater";
 import { decrypt } from "@/lib/crypto/decrypt";
 
+// GitHub sends a GET ping when the webhook is first saved — must return 200
+export async function GET() {
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: NextRequest) {
   // Read raw body for signature verification
   const rawBody = await req.text();
