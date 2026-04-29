@@ -2,10 +2,11 @@ import { getSession } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Github, Gitlab, GitCommit, Clock, User } from "lucide-react";
+import { ArrowLeft, Github, Gitlab, Clock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TriggerButton } from "@/components/pipelines/TriggerButton";
 import {
   formatRelativeTime,
   formatDuration,
@@ -47,14 +48,14 @@ export default async function PipelineDetailPage({
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/pipelines">
             <ArrowLeft className="w-4 h-4" />
             Pipelines
           </Link>
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 flex-wrap">
           {pipeline.provider === "github" ? (
             <Github className="w-5 h-5" />
           ) : (
@@ -63,6 +64,9 @@ export default async function PipelineDetailPage({
           <h1 className="text-xl font-bold">{pipeline.repo_full_name}</h1>
           <StatusBadge status={pipeline.last_status ?? "unknown"} />
         </div>
+        {pipeline.provider === "github" && (
+          <TriggerButton pipelineId={pipeline.id} defaultBranch={pipeline.default_branch} />
+        )}
       </div>
 
       {/* Run History */}
@@ -73,8 +77,13 @@ export default async function PipelineDetailPage({
 
         {runs?.length === 0 && (
           <Card>
-            <CardContent className="py-12 text-center text-muted-foreground text-sm">
-              No runs yet. Push a commit to trigger your first pipeline run.
+            <CardContent className="py-12 text-center space-y-2">
+              <p className="font-medium text-sm">No runs yet</p>
+              <p className="text-muted-foreground text-xs max-w-sm mx-auto">
+                Status shows <strong>Unknown</strong> until the first pipeline run is received.
+                Make sure a webhook is configured on this repository, then push a commit
+                — or click <strong>Run Pipeline</strong> above to trigger a manual run.
+              </p>
             </CardContent>
           </Card>
         )}
