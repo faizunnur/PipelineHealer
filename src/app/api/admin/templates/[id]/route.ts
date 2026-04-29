@@ -23,7 +23,7 @@ export async function PUT(
 
   type TemplateUpdate = {
     name?: string; title?: string; description?: string; category?: string;
-    provider?: string; content?: string; tags?: string[];
+    provider?: "github" | "gitlab" | "both"; content?: string; tags?: string[];
     is_featured?: boolean; is_official?: boolean;
     status?: "pending" | "approved" | "rejected";
   };
@@ -32,7 +32,7 @@ export async function PUT(
   if (name !== undefined) { update.name = name; update.title = title ?? name; }
   if (description !== undefined) update.description = description;
   if (category !== undefined) update.category = category;
-  if (provider !== undefined) update.provider = provider;
+  if (provider !== undefined) update.provider = provider as "github" | "gitlab" | "both";
   if (content !== undefined) update.content = content;
   if (tags !== undefined) update.tags = tags;
   if (is_featured !== undefined) update.is_featured = is_featured;
