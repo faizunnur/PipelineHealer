@@ -12,18 +12,45 @@ export async function* streamChatResponse(
   messages: ChatMessage[],
   pipelineContext?: string
 ): AsyncGenerator<string> {
-  const systemPrompt = pipelineContext
+  const systemText = pipelineContext
     ? `${CHAT_SYSTEM_PROMPT}\n\nUser's pipeline context:\n${pipelineContext}`
     : CHAT_SYSTEM_PROMPT;
 
   // Keep last 10 messages to limit tokens
-  const trimmedMessages = messages.slice(-10);
+  const trimmed = messages.slice(-10);
+
+  // Add cache_control to the second-to-last message so the growing conversation
+  // history gets cached once it reaches Haiku 4.5's 4096-token minimum
+  const messagesForRequest: Anthropic.MessageParam[] = trimmed.map(
+    (msg, idx) => {
+      if (idx === trimmed.length - 2 && trimmed.length >= 2) {
+        return {
+          role: msg.role,
+          content: [
+            {
+              type: "text",
+              text: msg.content,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+        };
+      }
+      return { role: msg.role, content: msg.content };
+    }
+  );
 
   const stream = await client.messages.stream({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
-    system: systemPrompt,
-    messages: trimmedMessages,
+    model: "claude-haiku-4-5",
+    max_tokens: 2048,
+    // Cache the system prompt — activates once total prefix exceeds 4096 tokens
+    system: [
+      {
+        type: "text",
+        text: systemText,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+    messages: messagesForRequest,
   });
 
   for await (const chunk of stream) {

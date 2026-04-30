@@ -13,6 +13,19 @@ export interface HealingAnalysis {
   tokens_used: number;
 }
 
+// CI logs put errors at the END — take the tail for better signal
+function extractRelevantLogs(log: string, maxChars = 3000): string {
+  if (log.length <= maxChars) return log;
+  const lines = log.split("\n").filter((l) => l.trim());
+  let result = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const candidate = lines[i] + "\n" + result;
+    if (candidate.length > maxChars) break;
+    result = candidate;
+  }
+  return result.trim() || log.slice(-maxChars);
+}
+
 export async function analyzeAndHeal(
   errorExcerpt: string,
   workflowContext?: {
@@ -34,7 +47,7 @@ Failed Job: ${workflowContext?.jobName ?? "unknown"}
 
 Error Excerpt (last lines of failed job log):
 \`\`\`
-${errorExcerpt.slice(0, 3000)}
+${extractRelevantLogs(errorExcerpt)}
 \`\`\`${contextBlock}
 
 Analyze this failure and provide the JSON fix.`;
@@ -42,18 +55,27 @@ Analyze this failure and provide the JSON fix.`;
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
-    system: HEALER_SYSTEM_PROMPT,
+    // Array format enables cache_control — caches once total prefix reaches Sonnet 4.6's 2048-token minimum
+    system: [
+      {
+        type: "text",
+        text: HEALER_SYSTEM_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
     messages: [{ role: "user", content: userMessage }],
   });
 
   const tokensUsed =
-    response.usage.input_tokens + response.usage.output_tokens;
+    (response.usage.input_tokens ?? 0) +
+    (response.usage.output_tokens ?? 0) -
+    ((response.usage.cache_read_input_tokens ?? 0) * 9) / 10; // cache reads cost ~0.1x
+
   const rawText =
     response.content[0].type === "text" ? response.content[0].text : "{}";
 
   let parsed: Omit<HealingAnalysis, "tokens_used">;
   try {
-    // Strip any accidental markdown code fences
     const cleaned = rawText.replace(/^```json?\n?|```$/gm, "").trim();
     parsed = JSON.parse(cleaned);
   } catch {
@@ -67,5 +89,5 @@ Analyze this failure and provide the JSON fix.`;
     };
   }
 
-  return { ...parsed, tokens_used: tokensUsed };
+  return { ...parsed, tokens_used: Math.ceil(tokensUsed) };
 }
