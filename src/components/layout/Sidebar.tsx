@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, Zap, LogOut, Shield, Bell,
   FlaskConical, Gauge, ScanLine, Network, BarChart3, RotateCcw,
   FileBarChart, LayoutTemplate, ShieldCheck, Building2, FolderCode,
-  TrendingUp, Rocket, Package, GitPullRequestDraft, AlertTriangle,
+  TrendingUp, Rocket, Package, GitPullRequestDraft, AlertTriangle, Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -41,7 +41,8 @@ const navGroups: NavGroup[] = [
       { href: "/optimize", label: "Optimizer",       icon: Gauge },
       { href: "/scanner",  label: "Security Scan",   icon: ScanLine },
       { href: "/patterns", label: "Failure Patterns",icon: Network },
-      { href: "/env-audit",label: "Env Audit",       icon: ShieldCheck },
+      { href: "/env-audit",     label: "Env Audit",     icon: ShieldCheck },
+      { href: "/intelligence",  label: "Intelligence",  icon: Cpu },
     ],
   },
   {

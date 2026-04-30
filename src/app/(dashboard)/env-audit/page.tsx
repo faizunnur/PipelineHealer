@@ -3,20 +3,30 @@
 import { useState, useEffect } from "react";
 import {
   ShieldCheck, Loader2, AlertTriangle, AlertCircle, Info,
-  CheckCircle2, Play, FileCode,
+  CheckCircle2, Play, FileCode, Sparkles, Zap, X,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 
 type Pipeline = { id: string; repo_full_name: string; provider: string };
+type AiFixResult = {
+  explanation: string;
+  original_code: string | null;
+  fixed_code: string | null;
+  confidence: "high" | "medium" | "low";
+};
 type Finding = {
   id: string; file_path: string; severity: string; rule: string;
   title: string; description: string; evidence: string;
   line_number: number | null; recommendation: string;
   resolved: boolean; resolved_at: string | null;
+  ai_fix_result: AiFixResult | null;
 };
 
 const SEV: Record<string, { icon: React.ReactNode; color: string; bg: string; border: string; label: string; order: number }> = {
@@ -24,6 +34,12 @@ const SEV: Record<string, { icon: React.ReactNode; color: string; bg: string; bo
   high:     { icon: <AlertCircle  className="w-4 h-4" />, color: "text-orange-500",     bg: "bg-orange-500/5",   border: "border-orange-500/40",   label: "High",     order: 1 },
   medium:   { icon: <AlertCircle  className="w-4 h-4" />, color: "text-yellow-500",     bg: "bg-yellow-500/5",   border: "border-yellow-500/40",   label: "Medium",   order: 2 },
   low:      { icon: <Info         className="w-4 h-4" />, color: "text-muted-foreground", bg: "bg-muted/30",      border: "border-border",           label: "Low",      order: 3 },
+};
+
+const CONFIDENCE_COLOR: Record<string, string> = {
+  high: "text-success border-success/40 bg-success/5",
+  medium: "text-yellow-500 border-yellow-500/40 bg-yellow-500/5",
+  low: "text-muted-foreground border-border bg-muted/30",
 };
 
 function sortFindings(list: Finding[]) {
@@ -37,6 +53,12 @@ export default function EnvAuditPage() {
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showResolved, setShowResolved] = useState(false);
+  const [aiFixLoading, setAiFixLoading] = useState<string | null>(null);
+
+  // Manual apply modal state
+  const [applyModal, setApplyModal] = useState<{
+    open: boolean; finding: Finding | null; applying: boolean; error: string | null; success: boolean;
+  }>({ open: false, finding: null, applying: false, error: null, success: false });
 
   useEffect(() => {
     fetch("/api/pipelines")
@@ -63,18 +85,11 @@ export default function EnvAuditPage() {
     setScanning(true);
     const res = await fetch(`/api/env-audit/${selectedPipeline}`, { method: "POST" });
     setScanning(false);
-
     if (res.ok) {
       const d = await res.json();
-      // Use findings returned directly from scan — no separate GET needed
-      if (d.findings && d.findings.length > 0) {
-        setFindings(sortFindings(d.findings));
-      } else if (d.totalFindings === 0) {
-        setFindings([]);
-      } else {
-        // Fallback: load from DB in case insert returned empty
-        await loadFindings(selectedPipeline);
-      }
+      if (d.findings && d.findings.length > 0) setFindings(sortFindings(d.findings));
+      else if (d.totalFindings === 0) setFindings([]);
+      else await loadFindings(selectedPipeline);
       toast({
         title: `Scan complete — ${d.totalFindings} finding${d.totalFindings !== 1 ? "s" : ""}`,
         description: [
@@ -90,6 +105,43 @@ export default function EnvAuditPage() {
     }
   }
 
+  async function handleAiFix(finding: Finding) {
+    setAiFixLoading(finding.id);
+    try {
+      const res = await fetch("/api/ai-fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finding }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        toast({ title: "AI fix failed", description: result.error, variant: "destructive" });
+        return;
+      }
+      // Save to DB
+      await fetch(`/api/env-audit/${selectedPipeline}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId: finding.id, ai_fix_result: result }),
+      });
+      // Update local state
+      setFindings((prev) =>
+        prev.map((f) => f.id === finding.id ? { ...f, ai_fix_result: result } : f)
+      );
+    } finally {
+      setAiFixLoading(null);
+    }
+  }
+
+  async function dismissFix(finding: Finding) {
+    await fetch(`/api/env-audit/${selectedPipeline}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ findingId: finding.id, ai_fix_result: null }),
+    });
+    setFindings((prev) => prev.map((f) => f.id === finding.id ? { ...f, ai_fix_result: null } : f));
+  }
+
   async function toggleResolved(finding: Finding) {
     const res = await fetch(`/api/env-audit/${selectedPipeline}`, {
       method: "PATCH",
@@ -103,11 +155,52 @@ export default function EnvAuditPage() {
     }
   }
 
+  async function handleAutoApply(finding: Finding) {
+    if (!finding.ai_fix_result?.original_code) {
+      toast({ title: "Cannot auto-apply", description: "No exact code fix available. Use Manual Apply to review.", variant: "destructive" });
+      return;
+    }
+    setAiFixLoading(`apply-${finding.id}`);
+    try {
+      const res = await fetch("/api/ai-fix/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pipelineId: selectedPipeline, findingId: finding.id, source: "env_audit" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFindings((prev) => prev.map((f) => f.id === finding.id ? { ...f, resolved: true } : f));
+        toast({ title: "Fix applied!", description: "Committed to your repository." });
+      } else {
+        toast({ title: "Apply failed", description: data.error, variant: "destructive" });
+      }
+    } finally {
+      setAiFixLoading(null);
+    }
+  }
+
+  async function commitManualApply() {
+    if (!applyModal.finding) return;
+    setApplyModal((s) => ({ ...s, applying: true, error: null }));
+    const res = await fetch("/api/ai-fix/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pipelineId: selectedPipeline, findingId: applyModal.finding.id, source: "env_audit" }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setFindings((prev) => prev.map((f) => f.id === applyModal.finding!.id ? { ...f, resolved: true } : f));
+      setApplyModal((s) => ({ ...s, applying: false, success: true }));
+      toast({ title: "Fix applied!", description: "Committed to your repository." });
+    } else {
+      setApplyModal((s) => ({ ...s, applying: false, error: data.error }));
+    }
+  }
+
   const pipeline = pipelines.find((p) => p.id === selectedPipeline);
   const activeFindings = findings.filter((f) => !f.resolved);
   const resolvedFindings = findings.filter((f) => f.resolved);
   const displayed = showResolved ? findings : activeFindings;
-
   const counts = {
     critical: activeFindings.filter((f) => f.severity === "critical").length,
     high:     activeFindings.filter((f) => f.severity === "high").length,
@@ -167,9 +260,7 @@ export default function EnvAuditPage() {
 
       {/* Findings list */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
       ) : findings.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-16 text-center">
@@ -184,7 +275,6 @@ export default function EnvAuditPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {/* Header */}
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">
               {activeFindings.length} active finding{activeFindings.length !== 1 ? "s" : ""}
@@ -198,7 +288,6 @@ export default function EnvAuditPage() {
             )}
           </div>
 
-          {/* Group by file */}
           {Object.entries(
             displayed.reduce<Record<string, Finding[]>>((acc, f) => {
               acc[f.file_path] = acc[f.file_path] ?? [];
@@ -207,33 +296,28 @@ export default function EnvAuditPage() {
             }, {})
           ).map(([filePath, fileFindings]) => (
             <div key={filePath}>
-              {/* File header */}
               <div className="flex items-center gap-2 mb-2 text-sm font-medium">
                 <FileCode className="w-4 h-4 text-primary flex-shrink-0" />
                 <code className="text-xs bg-muted px-2 py-0.5 rounded">{filePath}</code>
-                <span className="text-xs text-muted-foreground">
-                  {fileFindings.length} finding{fileFindings.length !== 1 ? "s" : ""}
-                </span>
+                <span className="text-xs text-muted-foreground">{fileFindings.length} finding{fileFindings.length !== 1 ? "s" : ""}</span>
               </div>
 
-              <div className="space-y-3 pl-0">
+              <div className="space-y-3">
                 {fileFindings.map((finding) => {
                   const cfg = SEV[finding.severity] ?? SEV.low;
+                  const fix = finding.ai_fix_result;
+                  const isApplying = aiFixLoading === `apply-${finding.id}`;
+                  const isGenerating = aiFixLoading === finding.id;
                   return (
-                    <Card key={finding.id}
-                      className={`${cfg.border} border ${finding.resolved ? "opacity-55" : ""}`}>
+                    <Card key={finding.id} className={`${cfg.border} border ${finding.resolved ? "opacity-55" : ""}`}>
                       <CardContent className="p-4 space-y-3">
-                        {/* Top row: severity + rule + line */}
+                        {/* Top row */}
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`flex items-center gap-1 text-xs font-semibold ${cfg.color}`}>
                             {cfg.icon} {cfg.label}
                           </span>
                           <Badge variant="outline" className="text-xs font-mono">{finding.rule}</Badge>
-                          {finding.line_number && (
-                            <span className="text-xs text-muted-foreground">
-                              Line {finding.line_number}
-                            </span>
-                          )}
+                          {finding.line_number && <span className="text-xs text-muted-foreground">Line {finding.line_number}</span>}
                           {finding.resolved && (
                             <Badge variant="success" className="text-xs gap-1">
                               <CheckCircle2 className="w-2.5 h-2.5" /> Resolved
@@ -241,10 +325,8 @@ export default function EnvAuditPage() {
                           )}
                         </div>
 
-                        {/* Title */}
                         <p className="font-semibold text-sm">{finding.title}</p>
 
-                        {/* Evidence */}
                         {finding.evidence && (
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">Found:</p>
@@ -254,21 +336,29 @@ export default function EnvAuditPage() {
                           </div>
                         )}
 
-                        {/* Description */}
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          {finding.description}
-                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{finding.description}</p>
 
-                        {/* Recommendation */}
                         <div className="p-3 bg-success/5 border border-success/20 rounded-lg">
                           <p className="text-xs font-semibold text-success mb-1">How to fix</p>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            {finding.recommendation}
-                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">{finding.recommendation}</p>
                         </div>
 
-                        {/* Action */}
-                        <div className="flex items-center justify-end pt-1">
+                        {/* Action row */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                          {!fix ? (
+                            <button
+                              onClick={() => handleAiFix(finding)}
+                              disabled={isGenerating}
+                              className="flex items-center gap-1 text-xs px-3 py-1 rounded-md border border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                            >
+                              {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              Fix with AI
+                            </button>
+                          ) : (
+                            <span className="text-xs text-primary flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" /> AI fix ready
+                            </span>
+                          )}
                           <button
                             onClick={() => toggleResolved(finding)}
                             className={`text-xs px-3 py-1 rounded-md border transition-colors ${
@@ -280,6 +370,68 @@ export default function EnvAuditPage() {
                             {finding.resolved ? "Mark as active" : "Mark as resolved"}
                           </button>
                         </div>
+
+                        {/* AI Fix Panel */}
+                        {fix && (
+                          <div className="border border-primary/20 rounded-lg overflow-hidden">
+                            <div className="px-3 py-2 bg-primary/5 border-b border-primary/20 flex items-center justify-between">
+                              <span className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3" /> AI-Generated Fix
+                              </span>
+                              <Badge variant="outline" className={`text-[10px] ${CONFIDENCE_COLOR[fix.confidence]}`}>
+                                {fix.confidence} confidence
+                              </Badge>
+                            </div>
+                            <div className="p-3 space-y-3">
+                              <p className="text-xs text-muted-foreground leading-relaxed">{fix.explanation}</p>
+
+                              {fix.original_code && fix.fixed_code ? (
+                                <div className="space-y-1.5">
+                                  <div className="rounded-md overflow-hidden border border-destructive/20">
+                                    <div className="px-2.5 py-1 bg-destructive/10 text-[10px] font-semibold text-destructive/80 uppercase tracking-wide">Before</div>
+                                    <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-destructive/5 text-foreground max-h-40">{fix.original_code}</pre>
+                                  </div>
+                                  <div className="rounded-md overflow-hidden border border-success/20">
+                                    <div className="px-2.5 py-1 bg-success/10 text-[10px] font-semibold text-success/80 uppercase tracking-wide">After</div>
+                                    <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap overflow-x-auto bg-success/5 text-foreground max-h-40">{fix.fixed_code}</pre>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground italic">
+                                  Exact code snippet could not be determined. Apply the recommendation manually.
+                                </p>
+                              )}
+
+                              {/* Apply buttons */}
+                              <div className="flex items-center gap-2 flex-wrap pt-1">
+                                {fix.original_code && fix.fixed_code && (
+                                  <>
+                                    <button
+                                      onClick={() => setApplyModal({ open: true, finding, applying: false, error: null, success: false })}
+                                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-md border border-border text-foreground hover:bg-muted transition-colors"
+                                    >
+                                      <FileCode className="w-3 h-3" /> Manual Apply
+                                    </button>
+                                    <button
+                                      onClick={() => handleAutoApply(finding)}
+                                      disabled={isApplying}
+                                      className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                    >
+                                      {isApplying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                                      Auto Apply
+                                    </button>
+                                  </>
+                                )}
+                                <button
+                                  onClick={() => dismissFix(finding)}
+                                  className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <X className="w-3 h-3" /> Dismiss Fix
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   );
@@ -294,15 +446,76 @@ export default function EnvAuditPage() {
                 <CheckCircle2 className="w-5 h-5 text-success flex-shrink-0" />
                 <div>
                   <p className="text-sm font-medium text-success">All findings resolved</p>
-                  <p className="text-xs text-muted-foreground">
-                    Run another audit after making changes to verify.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Run another audit after making changes to verify.</p>
                 </div>
               </CardContent>
             </Card>
           )}
         </div>
       )}
+
+      {/* Manual Apply Modal */}
+      <Dialog open={applyModal.open} onOpenChange={(o) => !applyModal.applying && setApplyModal((s) => ({ ...s, open: o }))}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCode className="w-4 h-4" /> Review & Apply Fix
+            </DialogTitle>
+          </DialogHeader>
+
+          {applyModal.finding && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                <code className="bg-muted px-2 py-0.5 rounded">{applyModal.finding.file_path}</code>
+                {applyModal.finding.line_number && <span>Line {applyModal.finding.line_number}</span>}
+                <Badge variant="outline" className={`text-[10px] ${CONFIDENCE_COLOR[applyModal.finding.ai_fix_result?.confidence ?? "low"]}`}>
+                  {applyModal.finding.ai_fix_result?.confidence} confidence
+                </Badge>
+              </div>
+
+              <p className="text-sm text-muted-foreground">{applyModal.finding.ai_fix_result?.explanation}</p>
+
+              <div className="space-y-1.5">
+                <div className="rounded-md overflow-hidden border border-destructive/20">
+                  <div className="px-2.5 py-1 bg-destructive/10 text-[10px] font-semibold text-destructive/80 uppercase tracking-wide">Before (will be replaced)</div>
+                  <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap bg-destructive/5 text-foreground overflow-x-auto max-h-48">
+                    {applyModal.finding.ai_fix_result?.original_code}
+                  </pre>
+                </div>
+                <div className="rounded-md overflow-hidden border border-success/20">
+                  <div className="px-2.5 py-1 bg-success/10 text-[10px] font-semibold text-success/80 uppercase tracking-wide">After (replacement)</div>
+                  <pre className="px-3 py-2 text-xs font-mono whitespace-pre-wrap bg-success/5 text-foreground overflow-x-auto max-h-48">
+                    {applyModal.finding.ai_fix_result?.fixed_code}
+                  </pre>
+                </div>
+              </div>
+
+              {applyModal.error && (
+                <p className="text-xs text-destructive bg-destructive/5 border border-destructive/20 px-3 py-2 rounded-md">
+                  {applyModal.error}
+                </p>
+              )}
+              {applyModal.success && (
+                <p className="text-xs text-success bg-success/5 border border-success/20 px-3 py-2 rounded-md flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Fix committed to repository successfully.
+                </p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApplyModal((s) => ({ ...s, open: false }))} disabled={applyModal.applying}>
+              {applyModal.success ? "Close" : "Cancel"}
+            </Button>
+            {!applyModal.success && (
+              <Button onClick={commitManualApply} disabled={applyModal.applying} className="gap-2">
+                {applyModal.applying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                Commit to Repository
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

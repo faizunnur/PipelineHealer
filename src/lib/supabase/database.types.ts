@@ -63,7 +63,7 @@ type ChatMessageRow = {
   content: string; tokens_used: number; created_at: string;
 };
 type TokenUsageRow = {
-  id: string; user_id: string; feature: "healing" | "chat"; model: string;
+  id: string; user_id: string; feature: "healing" | "chat" | "ai-fix" | "optimize"; model: string;
   tokens_in: number; tokens_out: number; total: number; ref_id: string | null; created_at: string;
 };
 type NotificationChannelRow = {
@@ -88,7 +88,8 @@ type SecretScanResultRow = {
   id: string; pipeline_id: string; user_id: string; file_path: string;
   severity: "critical" | "high" | "medium" | "low" | "info"; rule_id: string;
   title: string; description: string; evidence: string | null; recommendation: string;
-  status: "open" | "resolved" | "false_positive"; created_at: string;
+  status: "open" | "resolved" | "false_positive" | "dismissed" | "fixed";
+  ai_fix_result: Json | null; created_at: string;
 };
 type FailurePatternRow = {
   id: string; user_id: string; error_hash: string; normalized_error: string;
@@ -118,6 +119,7 @@ type EnvVarAuditRow = {
   title: string | null; description: string | null; evidence: string | null;
   line_number: number | null; recommendation: string | null;
   resolved: boolean; resolved_at: string | null;
+  ai_fix_result: Json | null;
   var_name: string | null; status: string | null;
   detected_in: string | null; last_checked_at: string | null; created_at: string;
 };

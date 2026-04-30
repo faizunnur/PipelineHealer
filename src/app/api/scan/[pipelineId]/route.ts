@@ -101,14 +101,22 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { pipelineId } = await params;
+  const { pipelineId: _pid } = await params;
   const db = createAdminClient();
 
-  await db
-    .from("secret_scan_results")
-    .update({ status: body.status })
-    .eq("id", body.id)
-    .eq("user_id", session.userId);
+  if ("ai_fix_result" in body) {
+    await db
+      .from("secret_scan_results")
+      .update({ ai_fix_result: body.ai_fix_result ?? null })
+      .eq("id", body.id)
+      .eq("user_id", session.userId);
+  } else {
+    await db
+      .from("secret_scan_results")
+      .update({ status: body.status })
+      .eq("id", body.id)
+      .eq("user_id", session.userId);
+  }
 
   return NextResponse.json({ ok: true });
 }

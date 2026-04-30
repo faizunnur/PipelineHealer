@@ -84,7 +84,11 @@ export async function POST(
 
     let savedFindings: unknown[] = [];
     if (allFindings.length > 0) {
-      const { data } = await db.from("env_var_audits").insert(allFindings).select();
+      const { data, error } = await db.from("env_var_audits").insert(allFindings).select();
+      if (error) {
+        console.error("env_var_audits insert error:", error.message);
+        return NextResponse.json({ error: `DB insert failed: ${error.message}` }, { status: 500 });
+      }
       savedFindings = data ?? [];
     }
 
@@ -129,15 +133,24 @@ export async function PATCH(
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { findingId, resolved } = await request.json();
+  const body = await request.json();
   const db = createAdminClient();
 
-  await db
-    .from("env_var_audits")
-    .update({ resolved: resolved ?? true, resolved_at: resolved ? new Date().toISOString() : null })
-    .eq("id", findingId)
-    .eq("pipeline_id", pipelineId)
-    .eq("user_id", session.userId);
+  if ("ai_fix_result" in body) {
+    await db
+      .from("env_var_audits")
+      .update({ ai_fix_result: body.ai_fix_result ?? null })
+      .eq("id", body.findingId)
+      .eq("pipeline_id", pipelineId)
+      .eq("user_id", session.userId);
+  } else {
+    await db
+      .from("env_var_audits")
+      .update({ resolved: body.resolved ?? true, resolved_at: body.resolved ? new Date().toISOString() : null })
+      .eq("id", body.findingId)
+      .eq("pipeline_id", pipelineId)
+      .eq("user_id", session.userId);
+  }
 
   return NextResponse.json({ success: true });
 }
