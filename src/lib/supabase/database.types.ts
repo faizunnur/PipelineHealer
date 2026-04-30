@@ -28,6 +28,7 @@ type PipelineRow = {
   repo_full_name: string; pipeline_name: string; default_branch: string;
   is_monitored: boolean; last_run_id: string | null; last_status: string | null;
   webhook_status: "created" | "exists" | "failed" | "skipped" | null;
+  consecutive_failures: number;
   created_at: string; updated_at: string;
 };
 type PipelineRunRow = {
@@ -137,6 +138,30 @@ type HealthReportRow = {
   top_failing_repos: Json; top_errors: Json; stats: Json;
   summary: string | null; sent_at: string | null; created_at: string;
 };
+type DeploymentRow = {
+  id: string; pipeline_id: string; user_id: string; run_id: string | null;
+  environment: "dev" | "staging" | "production" | "custom"; custom_env_name: string | null;
+  status: "pending_approval" | "approved" | "rejected" | "deployed" | "failed";
+  version: string | null; deployed_at: string | null; deployed_by: string | null;
+  approved_by: string | null; approved_at: string | null;
+  requires_approval: boolean; notes: string | null; created_at: string;
+};
+type PipelineArtifactRow = {
+  id: string; pipeline_id: string; run_id: string | null; user_id: string;
+  name: string; type: "docker" | "npm" | "s3" | "github-release" | "pypi" | "other";
+  url: string | null; version: string | null; size_bytes: number | null;
+  metadata: Json; created_at: string;
+};
+type AutoIssueRuleRow = {
+  id: string; pipeline_id: string; user_id: string; is_active: boolean;
+  consecutive_failures: number; labels: string[]; assignees: string[];
+  created_at: string;
+};
+type AutoIssueRow = {
+  id: string; pipeline_id: string; run_id: string | null; user_id: string;
+  github_issue_number: number | null; github_issue_url: string | null;
+  title: string | null; status: "open" | "closed"; created_at: string;
+};
 type RollbackEventRow = {
   id: string; user_id: string; pipeline_id: string;
   healing_event_id: string | null; run_id: string | null; trigger_run_id: string | null;
@@ -228,6 +253,19 @@ export type Database = {
       rollback_events: TableDef<RollbackEventRow, [
         { foreignKeyName: "rollback_events_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] },
         { foreignKeyName: "rollback_events_healing_event_id_fkey"; columns: ["healing_event_id"]; referencedRelation: "healing_events"; referencedColumns: ["id"] }
+      ]>;
+      deployments: TableDef<DeploymentRow, [
+        { foreignKeyName: "deployments_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] },
+        { foreignKeyName: "deployments_user_id_fkey"; columns: ["user_id"]; referencedRelation: "profiles"; referencedColumns: ["id"] }
+      ]>;
+      pipeline_artifacts: TableDef<PipelineArtifactRow, [
+        { foreignKeyName: "pipeline_artifacts_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] }
+      ]>;
+      auto_issue_rules: TableDef<AutoIssueRuleRow, [
+        { foreignKeyName: "auto_issue_rules_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] }
+      ]>;
+      auto_issues: TableDef<AutoIssueRow, [
+        { foreignKeyName: "auto_issues_pipeline_id_fkey"; columns: ["pipeline_id"]; referencedRelation: "pipelines"; referencedColumns: ["id"] }
       ]>;
       password_reset_tokens: TableDef<{
         id: string; email: string; token: string; expires_at: string; created_at: string;

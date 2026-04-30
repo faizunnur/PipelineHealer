@@ -1,830 +1,773 @@
 # PipelineHealer — User Manual
 
-> **Version:** 1.0 · **Powered by:** Royal Bengal AI
+> Complete guide to every feature. Last updated: 2026-04-30.
 
 ---
 
 ## Table of Contents
 
-1. [Introduction](#1-introduction)
-2. [Getting Started](#2-getting-started)
-   - [Creating an Account](#21-creating-an-account)
-   - [Logging In](#22-logging-in)
-   - [Forgot Password](#23-forgot-password)
-3. [Connecting Your First Repository](#3-connecting-your-first-repository)
-   - [Adding a GitHub Integration](#31-adding-a-github-integration)
-   - [Adding a GitLab Integration](#32-adding-a-gitlab-integration)
-   - [Setting Up the Webhook](#33-setting-up-the-webhook)
-4. [Adding Pipelines](#4-adding-pipelines)
-5. [Dashboard](#5-dashboard)
-6. [Healing Events](#6-healing-events)
-   - [Understanding a Healing Event](#61-understanding-a-healing-event)
-   - [Approving a Fix](#62-approving-a-fix)
-   - [Rejecting a Fix](#63-rejecting-a-fix)
-   - [Auto-Approve Mode](#64-auto-approve-mode)
-7. [Code Browser](#7-code-browser)
-   - [Browsing Files](#71-browsing-files)
-   - [Editing & Committing Files](#72-editing--committing-files)
-   - [Creating a New File](#73-creating-a-new-file)
-   - [Deleting a File](#74-deleting-a-file)
-8. [AI Assistant](#8-ai-assistant)
-9. [Intelligence Tools](#9-intelligence-tools)
-   - [Flaky Test Tracker](#91-flaky-test-tracker)
-   - [Performance Optimizer](#92-performance-optimizer)
-   - [Security Scanner](#93-security-scanner)
-   - [Failure Patterns](#94-failure-patterns)
-   - [Environment Audit](#95-environment-audit)
-10. [Operations](#10-operations)
-    - [SLA Monitoring](#101-sla-monitoring)
-    - [Rollback Manager](#102-rollback-manager)
-    - [Health Reports](#103-health-reports)
-    - [Notifications](#104-notifications)
-11. [Workspace](#11-workspace)
-    - [Pipeline Templates](#111-pipeline-templates)
-    - [Organizations & Teams](#112-organizations--teams)
-12. [Settings](#12-settings)
-    - [Profile](#121-profile)
-    - [Credentials](#122-credentials)
-    - [Auto-Healing Mode](#123-auto-healing-mode)
-    - [Deleting Your Account](#124-deleting-your-account)
-13. [Admin Panel](#13-admin-panel)
-    - [User Management](#131-user-management)
-    - [Token Usage Analytics](#132-token-usage-analytics)
-14. [Security & Privacy](#14-security--privacy)
-15. [Troubleshooting](#15-troubleshooting)
+1. [Getting Started](#1-getting-started)
+2. [Dashboard](#2-dashboard)
+3. [Pipelines](#3-pipelines)
+4. [Healing Events](#4-healing-events)
+5. [Integrations](#5-integrations)
+6. [Code Browser](#6-code-browser)
+7. [AI Assistant](#7-ai-assistant)
+8. [Intelligence — Flaky Tests](#8-flaky-tests)
+9. [Intelligence — Optimizer](#9-optimizer)
+10. [Intelligence — Security Scanner](#10-security-scanner)
+11. [Intelligence — Failure Patterns](#11-failure-patterns)
+12. [Intelligence — Env Audit](#12-env-audit)
+13. [DevOps — DORA Metrics](#13-dora-metrics)
+14. [DevOps — Build Analytics](#14-build-analytics)
+15. [DevOps — Deployments](#15-deployments)
+16. [DevOps — Artifacts](#16-artifacts)
+17. [DevOps — Incidents](#17-incidents)
+18. [DevOps — Auto GitHub Issues](#18-auto-github-issues)
+19. [Operations — SLA Dashboard](#19-sla-dashboard)
+20. [Operations — Rollback](#20-rollback)
+21. [Operations — Health Reports](#21-health-reports)
+22. [Operations — Notifications](#22-notifications)
+23. [Templates](#23-templates)
+24. [Organizations](#24-organizations)
+25. [Settings](#25-settings)
+26. [Admin Panel](#26-admin-panel)
+27. [Sidebar Navigation](#27-sidebar-navigation)
+28. [Troubleshooting](#28-troubleshooting)
 
 ---
 
-## 1. Introduction
+## 1. Getting Started
 
-**PipelineHealer** is an AI-powered CI/CD platform that automatically detects pipeline failures, proposes code fixes using Claude AI, and — with your approval — commits those fixes directly to your repository.
+### First Login
 
-Beyond auto-healing, it provides a full DevOps intelligence suite:
+1. Open the app and go to `/register` to create your account.
+2. Check your email for a verification link and click it.
+3. Log in at `/login`.
 
-| Capability | What it does |
-|------------|-------------|
-| **AI Auto-Healing** | Analyzes failed pipeline logs, proposes and applies code fixes |
-| **Code Browser** | Browse, edit, and commit files in any connected repository |
-| **Flaky Test Detection** | Identifies unreliable tests that fail intermittently |
-| **Performance Optimizer** | Suggests parallelism, caching, and runner improvements |
-| **Security Scanner** | Detects exposed secrets and misconfigurations in workflows |
-| **Failure Patterns** | Deduplicates and provides root-cause insights for recurring errors |
-| **Environment Audit** | Validates environment variable usage in workflow files |
-| **SLA Monitoring** | Tracks pipeline health against configurable thresholds |
-| **Rollback Manager** | Reverts commits without leaving the dashboard |
-| **Health Reports** | AI-generated daily/weekly/monthly pipeline health summaries |
-| **Notifications** | Slack, Teams, Discord, and email alerts |
-| **Organizations** | Multi-user team support with role-based access |
+### Connect Your First Integration
 
----
+Before any pipeline data appears, you need to connect GitHub or GitLab.
 
-## 2. Getting Started
+1. Go to **Integrations → New Integration**.
+2. Select your provider (GitHub or GitLab).
+3. Enter your username and a Personal Access Token.
+   - GitHub token scopes needed: `repo`, `workflow`
+   - GitLab token scopes needed: `api`, `read_repository`
+4. Click **Connect**. The token is encrypted with AES-256-GCM before storage — never stored in plain text.
 
-### 2.1 Creating an Account
+### Add Your First Pipeline
 
-1. Open PipelineHealer in your browser and click **Create one free** or navigate to `/register`.
-2. Enter your **Full Name**, **Email address**, and a **Password**.
+1. Go to **Pipelines → New Pipeline**.
+2. Select your connected integration and choose a repository.
+3. Click **Add Pipeline**.
+4. Click **Set Up Webhook** on the pipeline card — this registers the webhook in your GitHub/GitLab repo automatically.
 
-   Password requirements:
-   - At least 8 characters
-   - Contains at least one number
-   - Contains at least one uppercase letter
+### Set Up GitHub Webhook (manual fallback)
 
-3. Click **Create Account**.
-4. Check your inbox for a verification email from PipelineHealer. Click **Verify Email** in the email.
-5. After verification you are automatically signed in and redirected to the dashboard.
+If auto-setup fails, configure it manually:
 
-> **Note:** The verification link expires after 1 hour. If it expires, register again or contact support.
+1. In your GitHub repo: **Settings → Webhooks → Add webhook**
+2. **Payload URL**: `https://your-app.vercel.app/api/webhooks/github`
+3. **Content type**: `application/json`
+4. **Secret**: Copy from the Integrations page
+5. **Events**: check **Workflow jobs** and **Workflow runs**
+
+> For local development, use `ngrok http 3000` and use the HTTPS URL ngrok provides.
 
 ---
 
-### 2.2 Logging In
+## 2. Dashboard
 
-1. Navigate to `/login`.
-2. Enter your **Email** and **Password**.
-3. Click **Sign In**.
+The dashboard gives a real-time overview of your pipeline health.
 
-If your email is not yet verified, you will see a message asking you to check your inbox first.
+| Card | What it shows |
+|---|---|
+| Total Pipelines | Number of monitored repositories |
+| Active Runs | Pipelines currently executing |
+| Healing Events | AI fixes generated in the last 30 days |
+| Success Rate | Percentage of runs that passed |
 
----
-
-### 2.3 Forgot Password
-
-1. On the login page, click **Forgot password?**
-2. Enter your email address and click **Send reset link**.
-3. Check your inbox for a reset email. Click **Reset Password** in the email.
-4. Enter and confirm your new password, then click **Reset Password**.
-5. You are redirected to the login page. Sign in with your new password.
-
-> The reset link expires after **1 hour**.
+The activity feed shows the latest run events across all pipelines. Click any event to open the pipeline detail page.
 
 ---
 
-## 3. Connecting Your First Repository
+## 3. Pipelines
 
-Before PipelineHealer can monitor your pipelines, you must connect a GitHub or GitLab account and configure a webhook in your repository.
+### Pipeline List
 
-Navigate to **Integrations** in the sidebar, then click **Add Integration**.
+Each pipeline card shows:
+- Repository name and provider icon
+- Last run status with colour-coded badge (green = success, red = failed, amber = running/queued)
+- Time since last run
+- **View**, **Trigger**, and **Delete** action buttons
 
-### 3.1 Adding a GitHub Integration
+### Pipeline Detail
 
-1. Select **GitHub** as the provider.
-2. Enter your **GitHub username**.
-3. Create a **Personal Access Token** on GitHub:
-   - Go to `github.com/settings/tokens` → **Tokens (classic)** → **Generate new token**
-   - Required scopes: `repo`, `workflow`
-   - Copy the token immediately (it is shown only once)
-4. Paste the token into the **Personal Access Token** field.
-5. Click **Connect GitHub**.
+Click **View** on any pipeline to open the detail page. It shows:
 
-Your integration is now saved. PipelineHealer displays a **Webhook URL** and a **Webhook Secret** — keep these for the next step.
+- **Live status badge** — updates without page refresh (polls every 3 s while a run is active, every 15 s when idle)
+- **Trigger** button — manually starts the default-branch workflow via GitHub/GitLab API
+- **Run history** — recent runs with status, branch, commit SHA, duration, and triggered-by name
+- Each run expands to show **job-level breakdown** with per-job duration and error excerpts on failure
 
----
+### Live Run Animations
 
-### 3.2 Adding a GitLab Integration
+When a run is active:
+- The status badge pulses with a ring animation
+- Running run cards display a shimmer progress bar
+- The header shows a pulsing **Live** dot
+- An elapsed-time counter ticks up from job start in real time
 
-1. Select **GitLab** as the provider.
-2. Enter your **GitLab username**.
-3. Create a **Personal Access Token** on GitLab:
-   - Go to `gitlab.com/-/user_settings/personal_access_tokens`
-   - Required scopes: `api`, `read_repository`, `write_repository`
-4. Paste the token and click **Connect GitLab**.
+### Triggering a Pipeline
 
----
-
-### 3.3 Setting Up the Webhook
-
-After connecting, copy the **Webhook URL** and **Webhook Secret** shown on the Integrations page.
-
-**GitHub:**
-1. Go to your repository → **Settings** → **Webhooks** → **Add webhook**
-2. Set **Payload URL** to the webhook URL shown in PipelineHealer
-3. Set **Content type** to `application/json`
-4. Enter the **Secret**
-5. Under **Which events?** select: **Workflow jobs**, **Workflow runs**
-6. Click **Add webhook**
-
-**GitLab:**
-1. Go to your project → **Settings** → **Webhooks** → **Add new webhook**
-2. Enter the webhook URL
-3. Enter the secret token
-4. Enable: **Pipeline events**, **Job events**
-5. Click **Add webhook**
-
-> For **local development**, use [ngrok](https://ngrok.com): `ngrok http 3000` and use the generated HTTPS URL as the webhook payload URL.
-
-From this point, every pipeline failure in that repository will automatically trigger PipelineHealer to analyze the error and create a Healing Event.
+Click **Trigger** on the pipeline card or detail page. Select the target branch and click **Run**. The new run appears in the list within seconds once GitHub fires the webhook back.
 
 ---
 
-## 4. Adding Pipelines
+## 4. Healing Events
 
-A **Pipeline** represents a specific repository you want PipelineHealer to monitor. Pipelines are added manually — they do not appear automatically until you add them here.
+PipelineHealer automatically analyses every failed CI job and generates a fix using Claude AI.
 
-1. In the sidebar, click **Pipelines** → **Add Pipeline** (top right), or click **Add First Pipeline** if you have none yet.
-2. Select the **integration** (connected account) from the list. If you have only one, it is pre-selected.
-3. From the **Repository** dropdown, search and select the repository you want to monitor. The list is fetched directly from GitHub/GitLab — no typing required.
-4. The **Pipeline name** and **Default branch** are auto-filled from the repository. Edit them if needed.
-5. Click **Add Pipeline**.
+### How It Works
 
-The pipeline now appears on the Pipelines page. Webhook events from this repository will be linked to this pipeline automatically.
+1. GitHub fires a `workflow_job` webhook on job failure.
+2. PipelineHealer fetches the job log, strips ANSI codes and noise, and extracts the last ~100 meaningful lines.
+3. Claude Sonnet analyses the error excerpt and the workflow YAML, then produces a structured fix.
+4. A healing event is created and appears in **Healing Events** for your review.
 
----
+### Reviewing a Healing Event
 
-## 5. Dashboard
+Each event shows:
+- **Error excerpt** — raw failure text from the CI log
+- **AI Reason** — Claude's diagnosis of the root cause
+- **AI Solution** — plain-English explanation of the proposed fix
+- **Diff view** — original YAML vs. fixed YAML side by side
 
-The dashboard (`/dashboard`) is your home screen.
+### Approving or Rejecting
 
-| Section | What it shows |
-|---------|---------------|
-| **Stat cards** | Active pipelines, recent successes, recent failures, pending fixes |
-| **Recent Pipeline Runs** | Last 8 runs across all repos with status, commit, and branch |
-| **Pending Fixes** | Count of healing events waiting for your review; click to go to Healing Events |
-| **AI Healing Activity** | Recent healing events with final status (Fixed / Rejected / Pending) |
-| **AI Token Usage** | Your monthly token consumption vs. budget (green → yellow → red) |
+- **Approve** — PipelineHealer commits the fixed file to the repository branch via GitHub/GitLab API. The pipeline re-runs automatically.
+- **Reject** — Discards the suggestion. You can add a rejection note for future reference.
 
-Click any pipeline name to open its detail page. Click any healing event to review the proposed fix.
+### Approval Modes
 
----
+| Mode | Behaviour |
+|---|---|
+| Manual (default) | Every fix waits for your explicit approval |
+| Auto | Fix is committed immediately without review |
 
-## 6. Healing Events
+Change your mode in **Settings → Approval Mode**.
 
-Every time a pipeline fails, Claude AI analyzes the error log and creates a **Healing Event** — a proposed code fix with an explanation.
-
-### 6.1 Understanding a Healing Event
-
-Navigate to **Healing Events** in the sidebar. Events are grouped into two sections:
-
-- **Awaiting Review** — Events that need your decision (highlighted in yellow/amber)
-- **History** — All past events (applied, rejected, failed)
-
-Click any event to open its detail page (`/healing/{id}`), which shows:
-
-| Section | Content |
-|---------|---------|
-| **Error Output** | The raw error excerpt from the failed job log |
-| **Root Cause** | Claude's analysis of why the pipeline failed |
-| **Proposed Solution** | Claude's explanation of the fix |
-| **Code Diff** | Side-by-side Before (red) and After (green) view of the proposed file change |
-| **Metadata** | File path, token usage, AI model used, timestamps |
+> Use Auto mode only on low-risk, non-production pipelines you fully trust.
 
 ---
 
-### 6.2 Approving a Fix
+## 5. Integrations
 
-1. Open the Healing Event detail page.
-2. Review the **Error Output**, **Root Cause**, and **Code Diff** carefully.
-3. If the fix looks correct, click **Apply Fix** (green button).
-4. PipelineHealer commits the change directly to your repository using your stored GitHub/GitLab token.
-5. The status changes to **Applying** then **Applied** once the commit succeeds.
+### Adding an Integration
 
-The fix is committed with the message: `fix(ci): auto-heal - <reason>`
+Go to **Integrations → New Integration**. Provide:
+- **Provider**: GitHub or GitLab
+- **Username**: your provider account username
+- **Personal Access Token**: created in your provider's developer settings
 
----
+### Managing Integrations
 
-### 6.3 Rejecting a Fix
-
-1. On the Healing Event detail page, click **Reject** (outlined red button).
-2. The event is marked as **Rejected** and archived in History.
-
-Rejected events are kept for reference but no code is changed.
+- Click an integration to see its connected pipelines and webhook registration status.
+- **Delete** removes the integration and disconnects all associated pipelines (confirmation required).
+- Webhook secrets are shown once at creation — copy before closing the modal.
 
 ---
 
-### 6.4 Auto-Approve Mode
+## 6. Code Browser
 
-If you trust the AI completely for a repository, you can enable **Auto-Approve** mode in **Settings**. In this mode, fixes are committed immediately when the healing event is created — no manual review required.
+Browse repository file trees and view source files without leaving PipelineHealer.
 
-> ⚠️ Use auto-approve with caution. It is recommended only for non-production workflows or after you have validated the AI's quality on your specific repositories.
+1. Go to **Code Browser**.
+2. Select a repository from the dropdown.
+3. Optionally select a branch (defaults to the default branch).
+4. Navigate the file tree on the left; click a file to view it with syntax highlighting on the right.
 
-See [Settings → Auto-Healing Mode](#123-auto-healing-mode) to toggle this.
-
----
-
-## 7. Code Browser
-
-The Code Browser (`/repos`) lets you browse, view, edit, and commit files in any connected repository — without leaving PipelineHealer.
-
-### 7.1 Browsing Files
-
-1. Click **Code Browser** in the sidebar.
-2. Click the **account selector** (top left) and choose a connected integration.
-3. Click the **repository selector** and search for the repository you want to browse.
-4. The **branch selector** automatically defaults to the repository's default branch. Click it to switch branches.
-5. The **file tree** on the left shows all files and folders. Click a folder to expand it (contents are loaded on demand).
-6. Click any file to load it in the Monaco editor on the right.
-
-The URL updates automatically as you navigate, making every view bookmarkable and shareable.
+Useful for inspecting workflow files before approving a healing fix.
 
 ---
 
-### 7.2 Editing & Committing Files
+## 7. AI Assistant
 
-1. Open a file from the file tree.
-2. Edit the code directly in the Monaco editor (full syntax highlighting and auto-completion).
-3. When you have unsaved changes, a yellow **● unsaved changes** indicator appears in the breadcrumb bar, and a **Commit** button appears in the toolbar.
-4. Click **Commit**.
-5. In the dialog, enter a **commit message** (required).
-6. Click **Commit** to push the change to the selected branch.
+A full-featured chat interface powered by Claude.
 
-The file is updated in the repository immediately. The editor reloads with the new file SHA.
+- Ask questions about pipeline failures, YAML syntax, GitHub Actions best practices, or any CI/CD topic.
+- Conversations persist per session and survive page refreshes.
+- Each message shows token consumption. Your remaining budget is shown at the top.
+- Click **New Chat** to start a fresh conversation and clear the context window.
 
----
-
-### 7.3 Creating a New File
-
-1. Navigate to the repository and branch where you want the file.
-2. Click **New File** in the toolbar.
-3. In the dialog, enter the file path relative to the repository root (e.g. `.github/workflows/ci.yml`).
-4. Click **Create**. The file is created empty and opened in the editor.
-5. Write your content and commit it using the Commit button.
+Token budgets are managed per user; admins can adjust limits in the Admin Panel.
 
 ---
 
-### 7.4 Deleting a File
+## 8. Flaky Tests
 
-1. Open the file you want to delete.
-2. Click **Delete** in the toolbar (trash icon).
-3. Confirm the deletion in the dialog.
-4. The file is deleted with the commit message `chore: delete <path>`.
+Detects tests that pass in some runs and fail in others on the same branch.
 
-> ⚠️ File deletion is permanent. The file is removed from the branch's history via a new commit, but remains accessible in older commits on GitHub/GitLab.
+### How Flakiness is Detected
 
----
+PipelineHealer scans job logs across multiple runs. When a test name appears in both passing and failing outputs, it is flagged as flaky with a **flakiness score** (0–100, higher = more unreliable).
 
-## 8. AI Assistant
+### Flaky Test List
 
-The AI Assistant (`/chat`) is a conversational interface powered by Claude for CI/CD questions, workflow help, and general DevOps advice.
+Each entry shows:
+- Test name and file path
+- Failure count / pass count / total runs
+- Flakiness score
+- Last seen timestamp
 
-**Starting a conversation:**
-- Click a **suggested prompt** on the welcome screen, or
-- Type your question in the input box and press **Enter** (or click the send button)
-- Use **Shift+Enter** to add a new line without sending
+### Actions
 
-**Capabilities:**
-- Explain YAML syntax and GitHub Actions / GitLab CI concepts
-- Debug error messages you paste in
-- Generate workflow configurations from scratch
-- Suggest optimizations for specific pipeline patterns
-- Answer general CI/CD and DevOps questions
-
-**Chat sessions** are preserved per browser session. Click **New Chat** in the header to start a fresh conversation.
+- **Suppress** — marks as known-flaky, removes from alert thresholds
+- **Unsuppress** — re-enables alerting for that test
 
 ---
 
-## 9. Intelligence Tools
+## 9. Optimizer
 
-### 9.1 Flaky Test Tracker
+Analyses workflow YAML for performance improvements using Claude AI.
 
-**Location:** Sidebar → **Flaky Tests** (`/flaky`)
+### Running a Scan
 
-Flaky tests fail intermittently without code changes, producing noise and masking real bugs. PipelineHealer tracks every test result and surfaces the most unreliable ones.
+1. Go to **Optimizer**.
+2. Select a pipeline.
+3. Click **Analyze**.
 
-**How flakiness is calculated:**
-```
-flakiness_score = failure_count / (failure_count + pass_count)
-```
-A score above 0.5 (50%) is shown in red — the test fails more than it passes.
+### Suggestion Categories
 
-**Reading the list:**
-- **Flakiness bar** — visual percentage indicator (red = high, yellow = medium)
-- **Test name** — full test identifier
-- **Repo** — which pipeline the test belongs to
-- **Fail / Pass counts** — raw numbers
-- **Last seen** — when the test was last observed failing
+| Category | Examples |
+|---|---|
+| Caching | Add `actions/cache` for npm / pip / gradle |
+| Parallelism | Split sequential jobs into concurrent jobs |
+| Runner sizing | Right-size runner for compute-heavy steps |
+| Redundancy | Remove duplicate or no-op steps |
+| Matrix builds | Replace copy-pasted platform jobs with a matrix |
 
-**Suppressing a test:**
-Click **Suppress** next to any test to exclude it from healing triggers. The test still runs, but failures will not generate new Healing Events. Click again to un-suppress.
+Each suggestion shows estimated time saving, a code diff, and an **Apply** button that commits the change directly to the repo.
 
 ---
 
-### 9.2 Performance Optimizer
+## 10. Security Scanner
 
-**Location:** Sidebar → **Optimizer** (`/optimize`)
+Scans workflow files for security vulnerabilities across 10 rules.
 
-Analyzes your workflow YAML files and suggests changes to reduce build time.
+### Running a Scan
 
-**Running an analysis:**
-1. Select a pipeline from the dropdown.
-2. Click **Analyze Pipeline**.
-3. Claude AI fetches the workflow file and returns optimization suggestions.
+1. Go to **Security Scanner**.
+2. Select a pipeline.
+3. Click **Scan**.
 
-**Suggestion categories:**
+Results are grouped by severity: **Critical → High → Medium → Low → Info**.
 
-| Category | Example improvement |
-|----------|-------------------|
-| **Parallelism** | Run independent jobs simultaneously |
-| **Caching** | Cache `node_modules`, pip packages, Maven artifacts |
-| **Matrix** | Test against multiple Node/Python/Java versions at once |
-| **Job Splitting** | Separate lint, test, and build into parallel jobs |
-| **Runner Upgrade** | Use a larger runner for CPU-intensive steps |
+### Security Rules
 
-Each suggestion shows:
-- Estimated time saving per run
-- **Before** code (red) and **After** code (green) diff
-- Click **Dismiss** on suggestions you don't want to act on
+| Rule ID | Severity | Detects |
+|---|---|---|
+| SEC001 | Critical | Hardcoded secrets, tokens, API keys |
+| SEC002 | High | `pull_request_target` + `actions/checkout` (secret exfiltration risk) |
+| SEC003 | High | Actions pinned to `@main` or `@master` (supply chain risk) |
+| SEC004 | Medium | Missing `permissions` block (implicit write access) |
+| SEC005 | Medium | Script injection via `${{ github.event.*.body }}` |
+| SEC006 | Low | Jobs without `timeout-minutes` (runaway cost risk) |
+| SEC007 | Info | `:latest` Docker image tags (non-reproducible builds) |
+| SEC007a | Medium | Actions pinned to version tag only, not commit SHA |
+| SEC008 | High | `GITHUB_TOKEN` write permissions in `pull_request` workflows |
+| SEC009 | Medium | Self-hosted runners without label filtering |
+| SEC010 | Low | `workflow_dispatch` inputs with no type constraints |
+
+### Per-Finding Actions
+
+- **Mark as Resolved** — dismisses the finding after you fix it
+- **Mark as False Positive** — hides it from future scan results permanently
+
+Dismissed findings are collapsed into a summary at the bottom of the page.
 
 ---
 
-### 9.3 Security Scanner
+## 11. Failure Patterns
 
-**Location:** Sidebar → **Security Scan** (`/scanner`)
+Groups similar errors across all pipelines to surface recurring root causes.
 
-Scans your GitHub Actions or GitLab CI workflow files for exposed credentials, misconfigurations, and supply-chain risks.
+Each pattern shows:
+- Normalised error message
+- Occurrence count and affected pipelines
+- Last seen time
+- **AI Insight** — Claude's explanation of the underlying root cause
 
-**Running a scan:**
+Use this page to fix problems at the source rather than repeating the same fix across many pipelines.
+
+---
+
+## 12. Env Audit
+
+Scans workflow files and repository configuration for environment variable problems.
+
+### Running an Audit
+
+1. Go to **Env Audit**.
+2. Select a pipeline.
+3. Click **Scan**.
+
+### What It Finds
+
+- Secrets referenced in workflows but not configured in the repository
+- Secrets accidentally exposed via `echo` or `print` in `run:` steps
+- Variables used before they are defined
+- Deprecated or renamed variable names
+
+### Result Display
+
+Findings are grouped by file. Each finding shows severity, rule ID, line number, evidence snippet, description, and a "How to fix" recommendation. Click **Mark as resolved** after addressing a finding.
+
+---
+
+## 13. DORA Metrics
+
+Industry-standard engineering performance benchmarks calculated from your real pipeline run history.
+
+### The Four Metrics
+
+| Metric | What it measures | Elite benchmark |
+|---|---|---|
+| Deployment Frequency | Successful deployments per day | Multiple/day |
+| Lead Time for Changes | Avg time from job start to completion | < 1 hour |
+| Mean Time to Recovery | Time from failure to next success on the same branch | < 1 hour |
+| Change Failure Rate | % of runs that failed | 0–5% |
+
+### Performance Levels
+
+Each metric is rated **Elite / High / Medium / Low** against DORA industry benchmarks. Your current level is highlighted in the benchmark legend on each card.
+
+### Time Range
+
+Use the **7d / 30d / 90d** selector to change the analysis window. Longer windows produce more statistically accurate MTTR results.
+
+### Charts
+
+- **Daily Deployments** — stacked area chart of successes vs. failures per day
+- **Avg Build Duration** — line chart of build time trend over the period
+
+> Metrics improve in accuracy as you accumulate more pipeline history.
+
+---
+
+## 14. Build Analytics
+
+Six charts plus team and cost breakdowns for a chosen time window.
+
+### Summary KPIs
+
+| KPI | Description |
+|---|---|
+| Total Runs | All pipeline runs in the selected period |
+| Success Rate | Percentage that ended successfully |
+| Avg Duration | Mean run time shown as Xm Ys |
+| Est. CI Cost | Estimated spend at $0.008/min (Linux GitHub runner) |
+
+### Charts
+
+| Chart | Type | What it shows |
+|---|---|---|
+| Build Volume | Stacked bar | Daily success vs. failed counts |
+| Success Rate % | Area | Daily success rate trend |
+| Avg Build Duration | Line | Build time in seconds over time |
+| Daily CI Cost | Area | Estimated cost per day in USD |
+
+### CI Cost by Pipeline
+
+Ranked list of pipelines by total estimated cost, with a visual bar, total minutes, and USD cost.
+
+> Cost model: Linux $0.008/min · Windows 2× · macOS 10×. Shown as an estimate only.
+
+### Builds by Author
+
+Top 10 contributors by run count with success rate colour-coding (green ≥ 80 %, amber ≥ 60 %, red < 60 %).
+
+### Branch Health
+
+Top 10 branches by activity with a colour-coded success rate bar.
+
+---
+
+## 15. Deployments
+
+Track deployments to dev, staging, and production with optional human approval gates.
+
+### Environment Board
+
+Three columns: **Development · Staging · Production**. Each deployment appears as a card in the relevant column.
+
+### Creating a Deployment
+
+Click **New Deployment** and fill in:
+
+| Field | Description |
+|---|---|
+| Pipeline | Which repository is being deployed |
+| Environment | dev / staging / production / custom |
+| Version | Commit SHA or release tag (optional) |
+| Notes | Free-text context (optional) |
+| Requires approval | Toggle to enable the approval gate |
+
+Without approval, status is set to **Deployed** immediately.  
+With approval, status starts as **Pending Approval**.
+
+### Approval Gate Workflow
+
+1. Card shows **Approve** and **Reject** buttons.
+2. **Approve** → status becomes **Approved**; a **Deploy Now** button appears.
+3. **Deploy Now** → status becomes **Deployed** with deployer name and timestamp recorded.
+4. **Reject** → status becomes **Rejected**. Add a rejection note.
+
+### Deployment History
+
+The full history table at the bottom shows all deployments sorted by date.
+
+---
+
+## 16. Artifacts
+
+Track build outputs across your pipelines: Docker images, npm packages, S3 files, GitHub releases, and PyPI packages.
+
+### Adding an Artifact
+
+Click **Add Artifact** and provide:
+- Pipeline, artifact name, type, URL, version, size (bytes), and optional JSON metadata
+
+### Type Filter
+
+Use the filter tabs to show only one artifact type at a time (Docker, npm, S3, GitHub Release, PyPI, Other).
+
+### Stats Bar
+
+Shows total artifact count, total size across all artifacts, number of pipelines publishing artifacts, and number of distinct types.
+
+### Artifact Cards
+
+Each card shows the type badge, name, version, source pipeline, file size, creation date, and an external link if a URL is recorded.
+
+---
+
+## 17. Incidents
+
+Groups consecutive pipeline failures into incidents and tracks mean time to recovery (MTTR).
+
+### Active Incidents
+
+Shown at the top with a pulsing red indicator. Expand any incident to see every failed run with commit SHA, commit message, author, duration, and per-job error excerpts.
+
+### Resolved Incidents
+
+Shown below active incidents with **MTTR** (time from first failure to next success on the same branch) and recovery timestamp.
+
+### Critical Path Analysis
+
+The bottom section lists the **slowest completed runs** from the last 30 days. Each row shows:
+
+- Pass/fail status, repository, and branch
+- Total run duration
+- Per-job pills showing job name, individual duration, and pass/fail colour
+- A relative duration bar for visual comparison
+
+Use this to identify which jobs are your build bottlenecks.
+
+---
+
+## 18. Auto GitHub Issues
+
+Automatically creates a GitHub issue when a pipeline fails consecutively N times.
+
+### Creating a Rule
+
+Click **Add Rule** and configure:
+
+| Field | Description |
+|---|---|
+| Pipeline | Which pipeline to watch |
+| Consecutive failures | Threshold before an issue is opened (default: 3) |
+| Labels | Comma-separated labels applied to the issue |
+| Assignees | GitHub usernames to assign (comma-separated) |
+
+### How It Works
+
+1. Every webhook failure increments the pipeline's `consecutive_failures` counter.
+2. A successful run resets the counter to zero.
+3. When the counter hits the rule threshold, PipelineHealer opens a GitHub issue with the failure context.
+4. If an open issue already exists for that pipeline, no duplicate is created.
+
+### Managing Rules
+
+- Click the **toggle icon** to enable or disable a rule without deleting it.
+- Click **trash** to permanently delete a rule.
+
+### Issue Log
+
+Below the rules is a log of every auto-created issue with a direct link to GitHub, creation date, and a **Mark closed** button (records resolution in PipelineHealer; does not close the GitHub issue itself).
+
+---
+
+## 19. SLA Dashboard
+
+Define performance and reliability targets per pipeline and get alerted on breach.
+
+### Creating a Rule
+
+| Field | Description |
+|---|---|
+| Pipeline | The pipeline this SLA applies to |
+| Name | Descriptive name |
+| Metric | `duration`, `success_rate`, or `failure_count` |
+| Threshold | The limit value |
+| Window (hours) | Rolling time window for evaluation |
+| Notify channel | Channel to alert on breach (optional) |
+
+### Violations Table
+
+Shows every breach with the actual value, threshold, timestamp, and whether a notification was sent.
+
+---
+
+## 20. Rollback
+
+Reverts a pipeline to a prior successful state using one of three methods.
+
+### Rollback Methods
+
+| Method | What it does |
+|---|---|
+| Re-run last success | Re-triggers the last successful run via the provider API |
+| Revert commit | Creates a `git revert` commit and pushes it to the branch |
+| Create PR | Opens a pull request with the revert for peer review |
+
+### Using Rollback
+
 1. Select a pipeline.
-2. Click **Run Security Scan**.
+2. Choose the target (last successful run or a specific commit SHA).
+3. Select the rollback method.
+4. Click **Rollback**. The status updates from `applying` to `applied` or `failed`.
 
-**Severity levels:**
-
-| Level | Icon | Examples |
-|-------|------|---------|
-| **Critical** | 🔴 | Hardcoded AWS secret, private key in workflow |
-| **High** | 🟠 | GitHub PAT in plaintext, `pull_request_target` misuse |
-| **Medium** | 🟡 | Secrets echoed to logs, empty env var values |
-| **Low** | 🔵 | Generic API key pattern found |
-| **Info** | ⚪ | Informational observations |
-
-Each finding shows:
-- File path and line number
-- Rule ID (e.g. `SEC001: Hardcoded Secret`)
-- Redacted evidence (middle characters masked)
-- Recommendation for remediation
-
-Click **Show recommendation** to expand the remediation advice. Click **Dismiss** once you have resolved a finding.
+All rollback events are logged with result SHA, PR URL if applicable, and any errors encountered.
 
 ---
 
-### 9.4 Failure Patterns
+## 21. Health Reports
 
-**Location:** Sidebar → **Failure Patterns** (`/patterns`)
+AI-generated performance summaries for daily, weekly, or monthly periods.
 
-Surfaces recurring errors that appear across multiple pipelines or runs, so you can find systemic issues instead of fixing the same bug repeatedly.
+### Generating a Report
 
-**How it works:**
-1. Each job failure is normalized (paths, versions, timestamps stripped)
-2. A SHA-256 hash of the normalized error becomes the pattern key
-3. New failures matching an existing pattern increment its counter
-4. Patterns with 3+ occurrences can receive an **AI insight**
+Click **Last 24 Hours**, **Last 7 Days**, or **Last 30 Days**. Claude analyses your pipeline data and writes a summary covering:
 
-**Using AI insights:**
-- Click **Get AI Insight** on any pattern
-- Claude returns a root-cause analysis and permanent fix recommendation
-- The insight is cached — future views load it instantly
+- Overall health trend
+- Top failing pipelines and most common errors
+- Healing effectiveness
+- SLA compliance
 
-**Reading the list:**
-- **Occurrence count** — how many times this pattern has appeared (heat-colored: higher = redder)
-- **Affected repos** — which repositories are impacted
-- **Last seen** — when this error was last observed
+### Reading a Report
 
----
+Each report card shows the period, AI summary, and quick stats (pipelines, avg success rate, heals, SLA violations). Click **Expand** to see a per-pipeline breakdown.
 
-### 9.5 Environment Audit
+### Exporting Reports
 
-**Location:** Sidebar → **Env Audit** (`/env-audit`)
+Every report has two export buttons:
 
-Validates how environment variables are used in your workflow files and flags dangerous patterns.
-
-**Running an audit:**
-1. Select a pipeline.
-2. Click **Run Audit**.
-
-**Rules checked:**
-
-| Rule ID | What it detects |
-|---------|----------------|
-| ENV001 | Hardcoded secret values in `env:` blocks |
-| ENV002 | AWS Access Key ID patterns |
-| ENV003 | GitHub/GitLab PAT patterns |
-| ENV004 | Secrets echoed to logs (`echo $SECRET`) |
-| ENV005 | `pull_request_target` event with `secrets` access |
-| ENV006 | Secrets referenced inside embedded shell scripts |
-| ENV007 | Empty environment variable values |
-| ENV008 | Unprotected secret in matrix strategy |
-
-**Resolving findings:**
-- Click **Show details** to expand a finding and read the recommendation.
-- After addressing the issue in your code, click **Mark as resolved**.
-- Toggle **Show resolved** to view previously resolved findings.
+- **CSV** — spreadsheet with per-pipeline stats (runs, success rate, avg duration, heals, violations)
+- **JSON** — structured JSON with the full report including the AI summary text
 
 ---
 
-## 10. Operations
+## 22. Notifications
 
-### 10.1 SLA Monitoring
+Send alerts to Slack, Microsoft Teams, Discord, or email when key events occur.
 
-**Location:** Sidebar → **SLA Dashboard** (`/sla`)
+### Adding a Channel
 
-Define performance thresholds for your pipelines. PipelineHealer automatically tracks violations.
+1. Go to **Notifications → Add Channel**.
+2. Select type: Slack, Teams, Discord, or Email.
+3. For webhook-based channels: paste the incoming webhook URL.
+4. For email: enter the address.
+5. Select which events to subscribe to.
 
-**Creating an SLA rule:**
-1. Click **Add SLA Rule**.
-2. Select the **pipeline** the rule applies to.
-3. Enter a **Rule name** (e.g. "Max 10 min build").
-4. Select a **metric**:
+### Event Types
 
-| Metric | Description |
-|--------|-------------|
-| `max_duration` | Maximum pipeline duration in seconds |
-| `max_failures_per_day` | Maximum failed runs in any 24-hour window |
-| `max_consecutive_failures` | Maximum runs that can fail in a row |
-| `min_success_rate` | Minimum success percentage over the window |
+| Event | Triggers when |
+|---|---|
+| `run_failed` | Any monitored pipeline run fails |
+| `run_success` | Any monitored pipeline run succeeds |
+| `healing_applied` | A healing fix is committed to a repo |
+| `security_alert` | Scanner finds critical or high severity issues |
+| `sla_violation` | An SLA rule threshold is breached |
 
-5. Enter the **threshold** value.
-6. Enter the **window** (in hours) over which the metric is measured.
-7. Click **Create SLA Rule**.
+### Testing a Channel
 
-**Reading the dashboard:**
-- **Met** badge (green) — pipeline is within the defined threshold
-- **Violated** badge (red) — threshold has been breached; number of violations shown
-- Each rule card lists recent violations with actual vs. threshold values
+Click **Test** beside any channel to send a test notification immediately.
 
 ---
 
-### 10.2 Rollback Manager
+## 23. Templates
 
-**Location:** Sidebar → **Rollback** (`/rollback`)
+Ready-made workflow YAML templates to apply to pipelines in seconds.
 
-Reverts your repository to a known-good commit via the GitHub API — no local environment needed.
+### Browsing
 
-**Executing a rollback:**
-1. Select the **pipeline** (repository) from the dropdown.
-2. Select the **failed run** you want to roll back from.
-3. PipelineHealer fetches the last 10 commits for that branch and displays them as a list.
-4. Select the **target commit** — the state you want to restore to.
-5. Optionally enter a **reason** for your records.
-6. Click **Execute Rollback**.
+Filter by category (CI, Deploy, Security, Release…), provider (GitHub Actions, GitLab CI, Both), and language/framework. Click any template to preview the full YAML in the right panel.
 
-PipelineHealer creates a new forward commit whose tree matches the selected SHA. This is safe — it preserves git history and does not force-push.
+### Applying a Template
 
-**History tab:**
-Shows all past rollbacks with target SHA, result SHA, status, and any error messages.
+With a template selected, click **Apply to Pipeline**.
 
----
+**Automatic (commits to repo):**
+1. Select the target pipeline.
+2. Set the file path (e.g. `.github/workflows/ci.yml`).
+3. Click **Commit to Repo** — PipelineHealer creates or updates the file via GitHub/GitLab API.
 
-### 10.3 Health Reports
+**Manual (copy-paste):**
+1. The YAML and suggested file path are shown.
+2. Copy and paste into your repository manually.
 
-**Location:** Sidebar → **Health Reports** (`/reports`)
+### Contributing a Template
 
-Generates AI-summarized analytics for your pipelines over a selected period.
+Click **Contribute Template**. Provide:
+- Name, description, category, provider, YAML content, language tags
 
-**Generating a report:**
-Click **Generate Daily**, **Generate Weekly**, or **Generate Monthly**.
-
-**Each report includes:**
-- **AI narrative summary** (Claude Haiku) highlighting key trends, improvements, and concerns
-- **Aggregate stats:** total runs, success rate, AI heals, SLA violations
-- **Per-pipeline breakdown:**
-  - Total runs + average duration
-  - Success rate
-  - Number of healing events generated
-  - SLA violations
-
-Reports are saved and listed chronologically. Click any report card to expand the full breakdown.
+Submitted templates are set to **Pending Review** and visible to admins for approval. Approved templates appear in the public marketplace.
 
 ---
 
-### 10.4 Notifications
+## 24. Organizations
 
-**Location:** Sidebar → **Notifications** (`/notifications`)
+Group pipelines and team members under a shared workspace.
 
-Configure where PipelineHealer sends alerts.
+### Creating an Organisation
 
-**Adding a notification channel:**
-1. Click **Add Channel**.
-2. Select the provider:
-   - **Slack** — paste an Incoming Webhook URL
-   - **Microsoft Teams** — paste a Teams Incoming Webhook URL
-   - **Discord** — paste a Discord Webhook URL
-   - **Email** — enter a recipient email address
-3. Enter a **Channel name** for your reference.
-4. Select which **events** trigger a notification:
+1. Go to **Organizations → New**.
+2. Enter a name and optional description.
+3. Link a connected integration to associate a GitHub/GitLab organisation.
 
-| Event | When it fires |
-|-------|--------------|
-| `Pipeline Failure` | A pipeline run fails |
-| `Fix Ready for Review` | A new healing event is created |
-| `Fix Applied` | A fix is successfully committed |
-| `SLA Violation` | An SLA rule threshold is breached |
-| `Security Alert` | A critical secret scan finding is detected |
-| `Weekly Report` | A weekly health report is generated |
-
-5. Click **Add Channel**.
-
-**Testing a channel:**
-Click **Test** on any channel to send a sample message and verify delivery.
-
-**Pausing a channel:**
-Use the toggle switch on the channel card to pause or resume notifications without deleting the channel.
-
----
-
-## 11. Workspace
-
-### 11.1 Pipeline Templates
-
-**Location:** Sidebar → **Templates** (`/templates`)
-
-A library of ready-to-use workflow YAML templates for GitHub Actions and GitLab CI.
-
-**Browsing templates:**
-- Use the **search bar** to find templates by name or language
-- Filter by **category**: CI/Testing, Deploy, Docker, Release, Security, Other
-- Click any template card to preview the full YAML
-
-**Using a template:**
-1. Click the template card to expand the preview
-2. Click **Copy Template** to copy the YAML to your clipboard
-3. Paste into your `.github/workflows/` or `.gitlab-ci.yml` file
-4. Replace `{{VARIABLE_NAME}}` placeholders with your values
-
-**Submitting a template:**
-1. Click **Submit Template**
-2. Fill in the name, tags, description, category, provider, and YAML content
-3. Click **Submit Template** to contribute it to the library
-
----
-
-### 11.2 Organizations & Teams
-
-**Location:** Sidebar → **Organizations** (`/orgs`)
-
-Create teams and manage shared access to PipelineHealer resources.
-
-**Creating an organization:**
-1. Click **Create Organization**.
-2. Enter an **Organization name**.
-3. Enter a **slug** (URL-safe identifier, e.g. `my-team`).
-4. Optionally enter a description.
-5. Click **Create**. You become the owner automatically.
-
-**Roles:**
+### Member Roles
 
 | Role | Permissions |
-|------|------------|
-| **Owner** | Full control, delete org, manage all members and roles |
-| **Admin** | Invite/remove members, change roles (except owner) |
-| **Member** | View all org resources, trigger scans and reports |
-| **Viewer** | Read-only access to org resources |
+|---|---|
+| Owner | Full access, can delete org |
+| Admin | Manage members and pipelines |
+| Member | View and trigger pipelines |
+| Viewer | Read-only access |
 
-**Inviting a member:**
-1. Select your organization from the left list.
-2. Click **Invite**.
-3. Enter the member's registered PipelineHealer email address.
-4. Select their role.
-5. Click **Add Member**. They are added immediately (no email confirmation).
-
-> The invited person must already have a PipelineHealer account.
-
-**Changing a member's role:**
-Click the role dropdown next to any member and select a new role (owners and admins only).
-
-**Removing a member:**
-Click **Remove** next to the member's name.
-
-**Leaving an organization:**
-Click **Leave** next to your own name. Owners must transfer ownership before leaving.
-
-**Deleting an organization:**
-Owners can click **Delete** on the organization detail panel. This is permanent and cannot be undone.
+Invite members by entering their PipelineHealer email address.
 
 ---
 
-## 12. Settings
+## 25. Settings
 
-**Location:** Sidebar → **Settings** (`/settings`)
+### Profile
 
-### 12.1 Profile
+Update your display name and avatar URL.
 
-- Update your **Full Name** and click **Save Changes**.
-- Your **email address** is read-only and cannot be changed after registration.
+### Approval Mode
 
----
+Switch between **Manual** (default, requires explicit approval of every healing fix) and **Auto** (fixes committed immediately). See [Healing Events](#4-healing-events) for details.
 
-### 12.2 Credentials
+### Account
 
-Lists all connected GitHub/GitLab integrations.
+Change your password. Requires your current password for confirmation.
 
-**Editing credentials:**
-1. Click **Edit** next to an integration.
-2. Update the **Username** if needed.
-3. To rotate your token, enter a new **Personal Access Token** (leave blank to keep the existing one).
-4. Click **Save**.
+### Danger Zone
 
-**Removing an integration:**
-Click **Remove**. This disconnects the integration and stops monitoring for all pipelines associated with it.
+**Delete Account** permanently removes your account, pipelines, runs, and healing events. This action cannot be undone.
 
 ---
 
-### 12.3 Auto-Healing Mode
+## 26. Admin Panel
 
-**Manual** (default): Every AI-proposed fix requires your review and approval before being committed.
+Accessible only to users with the `admin` role.
 
-**Auto**: Fixes are committed immediately when the AI analysis completes — no review step.
+### User Management
 
-Toggle the **Auto-Approve Fixes** switch to change modes. A warning banner appears whenever Auto mode is active as a reminder.
+View all registered users. Per user you can:
+- **Suspend / Unsuspend** — blocks or restores login access immediately
+- **Promote to Admin** — grants admin role
+- **Adjust token budget** — set the maximum Claude tokens this user may consume
 
----
+### Template Management
 
-### 12.4 Deleting Your Account
+**Status tabs**: All / Pending Review / Approved / Rejected
 
-Located in the **Danger Zone** section at the bottom of Settings.
+For pending templates:
+- **Approve (✓)** — publishes the template to the marketplace
+- **Reject (✗)** — removes it from public view
 
-**What is permanently deleted:**
-- Your profile and all personal data
-- All integrations and encrypted tokens
-- All pipelines and pipeline runs
-- All healing events
-- All reports, notifications, and settings
+**Add Template** — admins can add templates directly and set Official / Featured flags.
 
-**To delete:**
-1. Read the warning carefully.
-2. Type your **email address exactly** in the confirmation field.
-3. Click **Delete My Account**.
+**Edit** — update any template's name, YAML, category, or flags.
 
-You are signed out immediately. **This action cannot be undone.**
+**Delete** — permanently removes the template with a confirmation dialog.
 
 ---
 
-## 13. Admin Panel
+## 27. Sidebar Navigation
 
-The Admin Panel is only accessible to users with the `admin` role. Navigate to `/admin` or look for **Admin Panel** at the bottom of the sidebar.
+### Collapsible Groups
 
-### 13.1 User Management
+Each of the four labelled groups (Intelligence, DevOps, Operations, Workspace) has a **chevron (›)** icon beside its label. Click it to collapse the group.
 
-**Location:** `/admin/users`
+- **Collapsed state (sidebar expanded):** items are hidden and replaced by a compact row of small icon buttons — you can still navigate without re-opening the group.
+- The group containing your **currently active page always stays expanded** automatically regardless of collapsed state.
 
-Displays all registered users with:
-- Name and email
-- Role (admin / user)
-- Status (Active / Suspended)
-- Monthly token usage (progress bar)
-- Approval mode (Auto / Manual)
-- Join date
+### Groups Reference
 
-**Available actions per user (via Actions dropdown):**
-- **Change role** — Promote to Admin or demote to User
-- **Change token budget** — Adjust the monthly AI token limit
-- **Suspend account** — Blocks the user from logging in and pauses healing
-- **Unsuspend account** — Restores access
-- **Delete user** — Permanently removes the account and all associated data
+| Group | Pages |
+|---|---|
+| *(Core — always visible)* | Dashboard, Pipelines, Healing Events, Integrations, Code Browser, AI Assistant |
+| Intelligence | Flaky Tests, Optimizer, Security Scanner, Failure Patterns, Env Audit |
+| DevOps | DORA Metrics, Build Analytics, Deployments, Artifacts, Incidents, Auto Issues |
+| Operations | SLA Dashboard, Rollback, Health Reports, Notifications |
+| Workspace | Templates, Organizations, Settings |
 
----
+### Collapsing the Sidebar
 
-### 13.2 Token Usage Analytics
-
-**Location:** `/admin/usage`
-
-Shows system-wide AI token consumption for the current month:
-- **Total tokens** used across all users
-- **Per-user breakdown:**
-  - Healing tokens (pipeline fixes)
-  - Chat tokens (AI Assistant)
-  - Total per user
-- Sorted by highest usage first
+Click the **← arrow** in the sidebar header to collapse to icon-only mode (56 px wide). Hover any icon to see its label in a tooltip. Click the **→ arrow** at the bottom to expand again.
 
 ---
 
-## 14. Security & Privacy
+## 28. Troubleshooting
 
-### Token Encryption
+### "No runs yet" on pipeline detail
 
-All GitHub and GitLab Personal Access Tokens are encrypted with **AES-256-GCM** before storage:
+- Confirm the webhook is active: GitHub repo → **Settings → Webhooks** → check for green ticks in Recent Deliveries.
+- Make sure the webhook URL has **no trailing slash**: `.../api/webhooks/github` not `.../api/webhooks/github/`.
+- Verify Supabase migration **0014** (UNIQUE indexes on `pipeline_runs` and `pipeline_jobs`) has been applied — without it, all upserts fail silently.
+- Go to GitHub → Webhooks → Recent Deliveries → **Redeliver** any missed events after applying migration 0014.
 
-```
-plaintext token → AES-256-GCM (random 12-byte IV) → ciphertext + IV + auth tag
-```
+### Healing events not appearing
 
-The encryption key (`ENCRYPTION_KEY`) is never stored in the database. Even with full database access, tokens cannot be decrypted without this key.
+- The pipeline must have `is_monitored = true` (set automatically via the UI).
+- Only `workflow_job` failure webhooks trigger healing. `workflow_run` events update the status badge only.
+- Check Vercel function logs for any `[webhook/github]` error lines.
 
-### Webhook Verification
+### Webhook showing 308 redirect
 
-Every incoming webhook is verified before processing:
+- Verify `next.config.ts` has `trailingSlash: false` and redeploy.
 
-```
-HMAC-SHA256(webhook_secret, request_body) === X-Hub-Signature-256 header
-```
+### Emails not sending
 
-Unverified requests are rejected with HTTP 401. Timing-safe comparison (`crypto.timingSafeEqual`) prevents timing attacks.
+- Confirm `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASS` are set correctly.
+- Port **465** requires SSL (`secure: true`). Port **587** uses STARTTLS.
 
-### Session Security
+### TypeScript build errors after a new migration
 
-Authentication uses a signed **JWT** (`jose` library, HS256, 7-day expiry) stored in an HTTP-only cookie named `ph_session`. Passwords are hashed with **bcryptjs** (12 rounds) and the hash is the only password-related value ever stored.
+- After running a new Supabase migration, manually add the new Row type to `src/lib/supabase/database.types.ts` and register the table inside the `Database` type — the TypeScript client is fully typed against this file.
 
-### Row-Level Data Isolation
+### Auto GitHub issues not being created
 
-All database queries filter by your user ID server-side. You can never read or modify another user's data via the API, even with a valid session token.
-
----
-
-## 15. Troubleshooting
-
-### Webhooks are not being received
-
-- Verify the **Payload URL** in your GitHub/GitLab settings exactly matches the URL shown on the Integrations page.
-- Check that the **Secret** matches.
-- For local development, confirm your ngrok tunnel is running and the URL is up to date.
-- In GitHub: go to the webhook page and click **Recent Deliveries** to see error responses.
-
-### "Registration failed — foreign key constraint"
-
-Run this SQL in your **Supabase SQL Editor** to drop the old Supabase Auth foreign key:
-
-```sql
-ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
-```
-
-### Healing event stuck on "Applying"
-
-The commit may have failed silently. Click the healing event and check the **Apply Error** section. Common causes:
-- The workflow file was changed since the event was created (file SHA mismatch)
-- The integration token has expired or was revoked — update it in Settings → Credentials
-- The token does not have the `workflow` scope — regenerate with correct scopes
-
-### Code Browser shows "Failed to load repos"
-
-- Confirm the integration token is still valid on GitHub/GitLab.
-- Verify the token has `repo` scope (GitHub) or `api` scope (GitLab).
-- Rotate the token in **Settings → Credentials** if it has expired.
-
-### Forgot password email not received
-
-- Check your spam/junk folder.
-- Verify `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, and `SMTP_PASS` are correctly set in your `.env.local` or deployment environment variables.
-- The SMTP error is logged to the server console — check it for the exact failure reason.
-
-### Token budget exhausted
-
-When your monthly token budget is used up, healing is paused for your account. Contact your admin to increase your token budget in the **Admin → Users** panel, or wait until the budget resets on the 1st of next month.
-
-### Build passes but pipeline does not appear
-
-Pipelines are only created when a webhook event is received **and** the repository is registered via **Add Pipeline**. Make sure you have:
-1. Added the pipeline via the Pipelines page
-2. Set up the webhook on the repository
-3. Triggered at least one pipeline run after the webhook was configured
+- Verify an **Auto Issue Rule** exists and is **Active** for that pipeline.
+- Check that the GitHub token has the `issues: write` scope (included in `repo`).
+- Check Vercel function logs for `[webhook/github] auto-issue creation failed`.
 
 ---
 
-*PipelineHealer is built and maintained by [Royal Bengal AI](https://github.com/Royal-Bengal-AI). For bug reports and feature requests, open an issue on the project repository.*
+*For initial setup, environment variables, and deployment instructions, see [SETUP.md](SETUP.md).*

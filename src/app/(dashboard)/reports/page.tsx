@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileBarChart, Loader2, Play, CheckCircle2, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import { FileBarChart, Loader2, Play, CheckCircle2, AlertTriangle, TrendingUp, TrendingDown, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,39 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+
+  function exportCSV(report: Report) {
+    const header = "Pipeline,Total Runs,Success Runs,Failed Runs,Success Rate %,Avg Duration (min),AI Heals,SLA Violations";
+    const rows = (report.stats ?? []).map((s) =>
+      [s.repoName, s.totalRuns, s.successRuns, s.failedRuns, s.successRate, s.avgDurationMinutes, s.healingEvents, s.slaViolations].join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pipeline-report-${report.period}-${report.period_start.slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportJSON(report: Report) {
+    const json = JSON.stringify({
+      period: report.period,
+      period_start: report.period_start,
+      period_end: report.period_end,
+      summary: report.summary,
+      generated_at: report.created_at,
+      pipelines: report.stats ?? [],
+    }, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pipeline-report-${report.period}-${report.period_start.slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   useEffect(() => {
     fetch("/api/reports").then((r) => r.json()).then((d) => {
@@ -132,10 +165,18 @@ export default function ReportsPage() {
                       </div>
                     )}
                     <span className="text-xs text-muted-foreground">{formatRelativeTime(report.created_at)}</span>
-                    <Button variant="ghost" size="sm" className="text-xs h-7"
-                      onClick={() => setExpanded(isExp ? null : report.id)}>
-                      {isExp ? "Collapse" : "Expand"}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => exportCSV(report)}>
+                        <Download className="w-3 h-3" /> CSV
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => exportJSON(report)}>
+                        <Download className="w-3 h-3" /> JSON
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-xs h-7"
+                        onClick={() => setExpanded(isExp ? null : report.id)}>
+                        {isExp ? "Collapse" : "Expand"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>

@@ -36,7 +36,9 @@ type Run = {
 interface Props {
   pipelineId: string;
   initialRuns: Run[];
+  initialStatus: string;
   provider: string;
+  onStatusChange?: (status: string) => void;
 }
 
 const ACTIVE_STATUSES = new Set(["running", "queued"]);
@@ -197,8 +199,9 @@ function RunCard({ run }: { run: Run }) {
   );
 }
 
-export function LivePipelineRuns({ pipelineId, initialRuns, provider }: Props) {
+export function LivePipelineRuns({ pipelineId, initialRuns, initialStatus, provider, onStatusChange }: Props) {
   const [runs, setRuns] = useState<Run[]>(initialRuns);
+  const [status, setStatus] = useState(initialStatus);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,11 +214,15 @@ export function LivePipelineRuns({ pipelineId, initialRuns, provider }: Props) {
         const data = await res.json();
         setRuns(data.runs ?? []);
         setLastRefreshed(new Date());
+        if (data.pipelineStatus && data.pipelineStatus !== status) {
+          setStatus(data.pipelineStatus);
+          onStatusChange?.(data.pipelineStatus);
+        }
       }
     } finally {
       if (!silent) setRefreshing(false);
     }
-  }, [pipelineId]);
+  }, [pipelineId, status, onStatusChange]);
 
   // Schedule next poll
   useEffect(() => {
