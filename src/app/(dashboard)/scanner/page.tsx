@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Shield, Play, Loader2, AlertTriangle, XCircle,
-  Info, CheckCircle2, FileCode, Sparkles, Zap, X,
+  Info, CheckCircle2, FileCode, Sparkles, Zap, X, Search,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -50,6 +51,10 @@ export default function ScannerPage() {
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [aiFixLoading, setAiFixLoading] = useState<string | null>(null);
+
+  // Search & filter
+  const [search, setSearch] = useState("");
+  const [sevFilter, setSevFilter] = useState("all");
 
   const [applyModal, setApplyModal] = useState<{
     open: boolean; finding: Finding | null; applying: boolean; error: string | null; success: boolean;
@@ -178,19 +183,40 @@ export default function ScannerPage() {
 
   const open = findings.filter((f) => f.status === "open");
   const dismissed = findings.filter((f) => f.status !== "open");
+
+  // Apply search + severity filter to open findings
+  const filteredOpen = useMemo(() => {
+    const q = search.toLowerCase();
+    return open.filter((f) => {
+      if (sevFilter !== "all" && f.severity !== sevFilter) return false;
+      if (q && !(
+        f.title.toLowerCase().includes(q) ||
+        f.rule_id.toLowerCase().includes(q) ||
+        f.description.toLowerCase().includes(q) ||
+        f.file_path.toLowerCase().includes(q) ||
+        (f.evidence ?? "").toLowerCase().includes(q)
+      )) return false;
+      return true;
+    });
+  }, [open, search, sevFilter]);
+
   const counts = SEVERITY_ORDER.reduce<Record<string, number>>((acc, s) => {
     acc[s] = open.filter((f) => f.severity === s).length;
     return acc;
   }, {});
+
   const bySeverity = SEVERITY_ORDER
-    .map((s) => ({ severity: s, items: open.filter((f) => f.severity === s) }))
+    .map((s) => ({ severity: s, items: filteredOpen.filter((f) => f.severity === s) }))
     .filter((g) => g.items.length > 0);
+
   const byFile = (items: Finding[]) =>
     Object.entries(items.reduce<Record<string, Finding[]>>((acc, f) => {
       acc[f.file_path] = acc[f.file_path] ?? [];
       acc[f.file_path].push(f);
       return acc;
     }, {}));
+
+  const hasFilters = search || sevFilter !== "all";
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
@@ -203,7 +229,7 @@ export default function ScannerPage() {
         </p>
       </div>
 
-      {/* Controls */}
+      {/* Pipeline selector + scan button */}
       <Card>
         <CardContent className="p-4 flex items-center gap-3 flex-wrap">
           <select
@@ -220,22 +246,83 @@ export default function ScannerPage() {
         </CardContent>
       </Card>
 
-      {/* Summary */}
+      {/* Summary counts */}
       {findings.length > 0 && (
         <div className="grid grid-cols-5 gap-3">
           {SEVERITY_ORDER.map((sev) => {
             const cfg = SEV[sev];
             const count = counts[sev];
             return (
-              <Card key={sev} className={count > 0 ? `${cfg.bg} ${cfg.border} border` : ""}>
-                <CardContent className="p-3 text-center">
+              <button
+                key={sev}
+                onClick={() => setSevFilter(sevFilter === sev ? "all" : sev)}
+                className={`rounded-lg border text-left transition-all ${
+                  count > 0 ? `${cfg.bg} ${cfg.border}` : "border-border"
+                } ${sevFilter === sev ? "ring-2 ring-primary ring-offset-1" : ""}`}
+              >
+                <div className="p-3 text-center">
                   <div className={`text-2xl font-bold ${count > 0 ? cfg.color : "text-muted-foreground"}`}>{count}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{cfg.label}</div>
-                </CardContent>
-              </Card>
+                </div>
+              </button>
             );
           })}
         </div>
+      )}
+
+      {/* Search + filter bar */}
+      {findings.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search findings…"
+              className="pl-9 h-9 text-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Severity quick-filter chips */}
+          <div className="flex gap-1.5 flex-wrap">
+            {(["all", ...SEVERITY_ORDER] as string[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSevFilter(s)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors capitalize ${
+                  sevFilter === s
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                }`}
+              >
+                {s === "all" ? "All" : s}
+              </button>
+            ))}
+          </div>
+
+          {hasFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSearch(""); setSevFilter("all"); }}
+              className="h-9 text-xs gap-1 text-muted-foreground flex-shrink-0"
+            >
+              <X className="w-3 h-3" /> Clear
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Result count when filtering */}
+      {hasFilters && findings.length > 0 && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          Showing {filteredOpen.length} of {open.length} open findings
+        </p>
       )}
 
       {!scanning && findings.length === 0 && !loading && (
@@ -248,7 +335,23 @@ export default function ScannerPage() {
         </Card>
       )}
 
-      {/* Findings */}
+      {/* No results after filter */}
+      {findings.length > 0 && filteredOpen.length === 0 && open.length > 0 && (
+        <Card className="border-dashed">
+          <CardContent className="py-10 text-center">
+            <Search className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-medium">No findings match your search</p>
+            <button
+              onClick={() => { setSearch(""); setSevFilter("all"); }}
+              className="text-xs text-primary hover:underline mt-1.5"
+            >
+              Clear filters
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Findings grouped by severity → file */}
       {bySeverity.map(({ severity, items }) => {
         const cfg = SEV[severity];
         return (
@@ -273,7 +376,6 @@ export default function ScannerPage() {
                     return (
                       <Card key={f.id} className={`border ${cfg2.border} ${cfg2.bg}`}>
                         <CardContent className="p-4 space-y-3">
-                          {/* Title row */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`font-semibold text-sm ${cfg2.color}`}>{f.title}</span>
@@ -304,7 +406,6 @@ export default function ScannerPage() {
                             <p className="text-xs text-muted-foreground leading-relaxed">{f.recommendation}</p>
                           </div>
 
-                          {/* Fix with AI button */}
                           <div className="flex items-center pt-1">
                             {!fix ? (
                               <button
@@ -322,7 +423,6 @@ export default function ScannerPage() {
                             )}
                           </div>
 
-                          {/* AI Fix Panel */}
                           {fix && (
                             <div className="border border-primary/20 rounded-lg overflow-hidden">
                               <div className="px-3 py-2 bg-primary/5 border-b border-primary/20 flex items-center justify-between">
